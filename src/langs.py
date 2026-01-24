@@ -2,7 +2,8 @@ LANGUAGES = {
     'English': {
         'settings': 'Settings',
         'upload_msg': 'Import B3 Statements (XLSX)',
-        'welcome_msg': '💡 Welcome! Please upload your B3 files in the sidebar.',
+        'welcome_msg': 'Ready to track your wealth journey?',
+        'welcome_sub': '💡 Please upload your B3 files in the sidebar to begin.',
         'fetching_prices': 'Updating live prices...',
         'total_invested': 'Total Invested',
         'market_value': 'Portfolio Value',
@@ -17,6 +18,12 @@ LANGUAGES = {
         'currency_label': 'Display Currency',
         'exchange_rate_msg': 'Market Rate',
         'status_loaded': '✅ Data loaded',
+        'tab_visuals': 'Dashboard',
+        'tab_data': 'Data Lab',
+        'step_1': '**Step 1**\n\nExport your statements from the B3 Investor Portal.',
+        'step_2': '**Step 2**\n\nUpload the files in the sidebar menu.',
+        'step_3': '**Step 3**\n\nAnalyze your evolution and cash flow!',
+        # Table Headers
         'col_ticker': 'Asset',
         'col_category': 'Type',
         'col_qty': 'Shares',
@@ -26,6 +33,7 @@ LANGUAGES = {
         'col_curr_price': 'Live Price',
         'col_yield': 'Return',
         'col_pnl': 'Net Result',
+        # Categories
         'cat_treasury': 'Bonds',
         'cat_reits': 'REITs',
         'cat_stocks': 'Stocks',
@@ -35,7 +43,8 @@ LANGUAGES = {
     'Português (Brasil)': {
         'settings': 'Configurações',
         'upload_msg': 'Importar Extratos B3 (XLSX)',
-        'welcome_msg': '💡 Bem-vindo! Importe seus arquivos da B3 na barra lateral.',
+        'welcome_msg': 'Pronto para acompanhar sua jornada?',
+        'welcome_sub': '💡 Por favor, faça o upload de seus arquivos da B3 na barra lateral.',
         'fetching_prices': 'Atualizando cotações...',
         'total_invested': 'Total Investido',
         'market_value': 'Patrimônio Atual',
@@ -50,6 +59,12 @@ LANGUAGES = {
         'currency_label': 'Moeda de Exibição',
         'exchange_rate_msg': 'Cotação Mercado',
         'status_loaded': '✅ Dados carregados',
+        'tab_visuals': 'Painel Visual',
+        'tab_data': 'Laboratório de Dados',
+        'step_1': '**Passo 1**\n\nExporte seus extratos no Portal do Investidor B3.',
+        'step_2': '**Passo 2**\n\nFaça o upload de seus arquivos no menu lateral.',
+        'step_3': '**Passo 3**\n\nAcompanhe sua evolução e proventos!',
+        # Cabeçalhos
         'col_ticker': 'Ativo',
         'col_category': 'Tipo',
         'col_qty': 'Qtd',
@@ -59,6 +74,7 @@ LANGUAGES = {
         'col_curr_price': 'Cotação Atual',
         'col_yield': 'Rent.',
         'col_pnl': 'Resultado',
+        # Categorias
         'cat_treasury': 'Tesouro',
         'cat_reits': 'FIIs',
         'cat_stocks': 'Ações',

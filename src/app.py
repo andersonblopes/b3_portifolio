@@ -57,7 +57,7 @@ if st.session_state['raw_df'] is not None:
     portfolio[C['col_pnl']] = portfolio[mkt_val_label] - portfolio[C['col_total_cost']]
     portfolio[C['col_yield']] = (portfolio[C['col_pnl']] / portfolio[C['col_total_cost']] * 100)
 
-    # 2. Key Metrics (Header)
+    # 2. Header Metrics
     t_cost, t_mkt = portfolio[C['col_total_cost']].sum(), portfolio[mkt_val_label].sum()
     t_earn = portfolio[C['col_earnings']].sum()
     perf = ((t_mkt / t_cost) - 1) * 100 if t_cost > 0 else 0
@@ -71,24 +71,23 @@ if st.session_state['raw_df'] is not None:
     st.divider()
 
     # 3. TAB ORGANIZATION
-    tab_charts, tab_data = st.tabs(["📊 " + texts['allocation_title'], "📝 " + texts['detailed_title']])
+    tab_charts, tab_data = st.tabs([f"📊 {texts['tab_visuals']}", f"📝 {texts['tab_data']}"])
 
     with tab_charts:
-        # Evolution Section
         st.subheader(f"📈 {texts['evolution_title']}")
         evolution_df = utils.calculate_evolution(raw_df, conv_factor)
         st.plotly_chart(charts.plot_evolution(evolution_df, curr_symbol), use_container_width=True)
 
-        # Earnings Flow
         st.subheader(f"💰 {texts['monthly_earnings_title']}")
         monthly_earn_df = utils.calculate_earnings_monthly(raw_df, conv_factor)
         if not monthly_earn_df.empty:
             st.plotly_chart(charts.plot_monthly_earnings(monthly_earn_df, curr_symbol), use_container_width=True)
+        else:
+            st.info("No income history found.")
 
         st.divider()
 
-        # Distribution Section
-        col_pie, col_bar = st.columns([1, 1])
+        col_pie, col_bar = st.columns(2)
         with col_pie:
             st.subheader(texts['allocation_title'])
             st.plotly_chart(
@@ -115,10 +114,23 @@ if st.session_state['raw_df'] is not None:
             use_container_width=True, hide_index=True
         )
 
-    # Reset Button at the bottom of the Sidebar
     if st.sidebar.button("🗑️ Reset Session"):
         st.session_state['raw_df'] = None
         st.session_state['last_hash'] = None
         st.rerun()
 else:
-    st.info(texts['welcome_msg'])
+    # 4. BRANDED HOME PAGE (FULLY TRANSLATED)
+    st.title("📈 B3 Portfolio Master")
+    st.markdown(f"### {texts['welcome_msg']}")
+    st.caption(texts['welcome_sub'])
+
+    col_msg1, col_msg2, col_msg3 = st.columns(3)
+    with col_msg1:
+        st.info(texts['step_1'])
+    with col_msg2:
+        st.info(texts['step_2'])
+    with col_msg3:
+        st.info(texts['step_3'])
+
+    st.divider()
+    st.image("https://images.unsplash.com/photo-1611974714851-eb605161ca81?auto=format&fit=crop&q=80&w=1000")
