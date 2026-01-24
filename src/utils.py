@@ -20,13 +20,46 @@ def get_exchange_rate():
         data = yf.download("USDBRL=X", period="1d", progress=False)
         return float(data['Close'].iloc[-1])
     except:
-        return 5.0  # Fallback
+        return 5.40
 
 
 def clean_ticker(text):
     if pd.isna(text): return "UNKNOWN"
     match = re.search(r'([A-Z]{4}[34567811]{1,2})', str(text).upper())
     return match.group(1) if match else str(text).split(' ')[0]
+
+
+def map_operation_type(text):
+    text = str(text).upper()
+    if any(term in text for term in ['COMPRA', 'BUY', 'LIQUIDAÇÃO']): return 'BUY'
+    if any(term in text for term in ['VENDA', 'SELL', 'RESGATE']): return 'SELL'
+    if any(term in text for term in ['RENDIMENTO', 'DIVIDEND', 'JCP', 'PROVENTO']): return 'EARNINGS'
+    return None
+
+
+@st.cache_data
+def load_and_process_files(uploaded_files):
+    """Standardized logic to read and clean B3 Excel files."""
+    all_data = []
+    for file in uploaded_files:
+        file.seek(0)
+        df = pd.read_excel(file)
+        if 'Data' not in df.columns:
+            for i, row in df.iterrows():
+                if 'Data' in [str(v) for v in row.values]:
+                    df.columns = df.iloc[i];
+                    df = df.iloc[i + 1:].reset_index(drop=True);
+                    break
+
+        temp = pd.DataFrame()
+        temp['date'] = pd.to_datetime(df['Data'], dayfirst=True, errors='coerce')
+        temp['type'] = df['Movimentação'].apply(map_operation_type)
+        temp['ticker'] = df['Produto'].apply(clean_ticker)
+        temp['raw_product'] = df['Produto']
+        temp['quantity'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(0)
+        temp['operation_value'] = pd.to_numeric(df['Valor da Operação'], errors='coerce').fillna(0)
+        all_data.append(temp.dropna(subset=['date', 'type']))
+    return pd.concat(all_data).sort_values(by='date') if all_data else pd.DataFrame()
 
 
 def get_asset_category(ticker, product_name, lang_code):
@@ -38,14 +71,6 @@ def get_asset_category(ticker, product_name, lang_code):
     if any(t.endswith(s) for s in ['3', '4', '5', '6']): return trans['cat_stocks']
     if any(x in p for x in ['CDB', 'LCI', 'LCA', 'DEBENTURE']): return trans['cat_fixed']
     return trans['cat_others']
-
-
-def map_operation_type(text):
-    text = str(text).upper()
-    if any(term in text for term in ['COMPRA', 'BUY', 'LIQUIDAÇÃO']): return 'BUY'
-    if any(term in text for term in ['VENDA', 'SELL', 'RESGATE']): return 'SELL'
-    if any(term in text for term in ['RENDIMENTO', 'DIVIDEND', 'JCP', 'PROVENTO']): return 'EARNINGS'
-    return None
 
 
 def calculate_portfolio(df, lang_code):

@@ -16,6 +16,8 @@ LANGUAGES = {
         'warning_duplicate': '⚠️ No new data detected. This file has already been processed.',
         'currency_label': 'Display Currency',
         'exchange_rate_msg': 'Exchange Rate',
+        'status_loaded': '✅ Data Loaded in Session',
+        'status_waiting': '📥 Waiting for Upload',
         # Table Headers
         'col_ticker': 'Ticker',
         'col_category': 'Category',
@@ -49,6 +51,8 @@ LANGUAGES = {
         'warning_duplicate': '⚠️ Nenhum dado novo detectado. Este arquivo já foi processado.',
         'currency_label': 'Moeda de Exibição',
         'exchange_rate_msg': 'Taxa de Câmbio',
+        'status_loaded': '✅ Dados Carregados na Sessão',
+        'status_waiting': '📥 Aguardando Upload',
         # Cabeçalhos da Tabela
         'col_ticker': 'Ticker',
         'col_category': 'Categoria',
