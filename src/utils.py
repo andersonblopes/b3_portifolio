@@ -9,18 +9,16 @@ from langs import LANGUAGES
 
 
 def get_data_hash(df):
-    """Generates a unique fingerprint for the dataframe content."""
     return hashlib.md5(pd.util.hash_pandas_object(df).values).hexdigest()
 
 
 @st.cache_data(ttl=3600)
 def get_exchange_rate():
-    """Fetches the current USD/BRL exchange rate from Yahoo Finance."""
     try:
         data = yf.download("USDBRL=X", period="1d", progress=False)
         return float(data['Close'].iloc[-1])
     except:
-        return 5.40
+        return 5.45
 
 
 def clean_ticker(text):
@@ -39,7 +37,6 @@ def map_operation_type(text):
 
 @st.cache_data
 def load_and_process_files(uploaded_files):
-    """Standardized logic to read and clean B3 Excel files."""
     all_data = []
     for file in uploaded_files:
         file.seek(0)
@@ -50,7 +47,6 @@ def load_and_process_files(uploaded_files):
                     df.columns = df.iloc[i];
                     df = df.iloc[i + 1:].reset_index(drop=True);
                     break
-
         temp = pd.DataFrame()
         temp['date'] = pd.to_datetime(df['Data'], dayfirst=True, errors='coerce')
         temp['type'] = df['Movimentação'].apply(map_operation_type)
@@ -66,10 +62,8 @@ def get_asset_category(ticker, product_name, lang_code):
     t, p = str(ticker).upper(), str(product_name).upper()
     trans = LANGUAGES[lang_code]
     if 'TESOURO' in p or 'TREASURY' in p: return trans['cat_treasury']
-    if t.endswith('11') and ('FII' in p or 'IMOBILIARIO' in p): return trans['cat_reits']
-    if any(t.endswith(s) for s in ['31', '32', '33', '34']): return 'BDRs'
+    if t.endswith('11'): return trans['cat_reits']
     if any(t.endswith(s) for s in ['3', '4', '5', '6']): return trans['cat_stocks']
-    if any(x in p for x in ['CDB', 'LCI', 'LCA', 'DEBENTURE']): return trans['cat_fixed']
     return trans['cat_others']
 
 
@@ -89,7 +83,6 @@ def calculate_portfolio(df, lang_code):
                 cost = qty * avg_p
             elif row['type'] == 'EARNINGS':
                 earnings += float(row['operation_value'])
-
         if round(qty, 2) > 0:
             summary.append({
                 trans['col_ticker']: asset,
@@ -100,6 +93,25 @@ def calculate_portfolio(df, lang_code):
                 trans['col_earnings']: earnings
             })
     return pd.DataFrame(summary)
+
+
+def calculate_evolution(df, conv_factor):
+    df_ev = df.copy()
+    df_ev['flow'] = df_ev.apply(
+        lambda r: r['operation_value'] if r['type'] == 'BUY' else (-r['operation_value'] if r['type'] == 'SELL' else 0),
+        axis=1)
+    ev = df_ev.groupby('date')['flow'].sum().cumsum().reset_index()
+    ev['flow'] *= conv_factor
+    return ev
+
+
+def calculate_earnings_monthly(df, conv_factor):
+    df_earn = df[df['type'] == 'EARNINGS'].copy()
+    if df_earn.empty: return pd.DataFrame(columns=['month_year', 'operation_value'])
+    df_earn['month_year'] = df_earn['date'].dt.strftime('%Y-%m')
+    monthly = df_earn.groupby('month_year')['operation_value'].sum().reset_index()
+    monthly['operation_value'] *= conv_factor
+    return monthly
 
 
 @st.cache_data(ttl=3600)
