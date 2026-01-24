@@ -74,27 +74,22 @@ if st.session_state['raw_df'] is not None:
     tab_charts, tab_data = st.tabs([f"📊 {texts['tab_visuals']}", f"📝 {texts['tab_data']}"])
 
     with tab_charts:
-        st.subheader(f"📈 {texts['evolution_title']}")
-        evolution_df = utils.calculate_evolution(raw_df, conv_factor)
-        st.plotly_chart(charts.plot_evolution(evolution_df, curr_symbol), use_container_width=True)
-
-        st.subheader(f"💰 {texts['monthly_earnings_title']}")
-        monthly_earn_df = utils.calculate_earnings_monthly(raw_df, conv_factor)
-        if not monthly_earn_df.empty:
-            st.plotly_chart(charts.plot_monthly_earnings(monthly_earn_df, curr_symbol), use_container_width=True)
-        else:
-            st.info("No income history found.")
+        st.markdown(f"### 📈 {texts['evolution_title']} & {texts['monthly_earnings_title']}")
+        ev_df = utils.calculate_evolution(raw_df, conv_factor)
+        mn_df = utils.calculate_earnings_monthly(raw_df, conv_factor)
+        # Combined chart with left-aligned legend
+        st.plotly_chart(charts.plot_combined_evolution(ev_df, mn_df, curr_symbol, texts), use_container_width=True)
 
         st.divider()
 
         col_pie, col_bar = st.columns(2)
         with col_pie:
-            st.subheader(texts['allocation_title'])
+            st.markdown(f"#### ⚖️ {texts['allocation_title']}")
             st.plotly_chart(
                 charts.plot_sunburst_allocation(portfolio, [C['col_category'], C['col_ticker']], mkt_val_label),
                 use_container_width=True)
         with col_bar:
-            st.subheader(texts['earnings_title'])
+            st.markdown(f"#### 🏆 {texts['earnings_title']}")
             st.plotly_chart(charts.plot_top_earners(portfolio, C['col_ticker'], C['col_earnings'], curr_symbol),
                             use_container_width=True)
 
@@ -119,7 +114,6 @@ if st.session_state['raw_df'] is not None:
         st.session_state['last_hash'] = None
         st.rerun()
 else:
-    # 4. BRANDED HOME PAGE (FULLY TRANSLATED)
     st.title("📈 B3 Portfolio Master")
     st.markdown(f"### {texts['welcome_msg']}")
     st.caption(texts['welcome_sub'])
