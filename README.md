@@ -15,10 +15,12 @@ statements. It provides real-time portfolio tracking, dividend analysis, and aut
 ## 🛠️ Project Structure
 
 ```text
-b3-importer/
-├── src/
-│   ├── app.py          # User Interface (Streamlit)
-│   └── utils.py        # Business Logic & Data Processing
+b3_importer/
+├── requirements.txt
+└── src/
+    ├── app.py          # Main Streamlit application
+    ├── utils.py        # Utility functions for data processing
+    └── langs.py        # Language support (i18n)
 ├── .gitignore          # Git exclusion rules (IDE, Data, Cache)
 ├── requirements.txt    # Project dependencies
 └── README.md           # Documentation
