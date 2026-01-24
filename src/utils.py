@@ -1,4 +1,4 @@
-import hashlib  # Critical for hashing
+import hashlib
 import re
 
 import pandas as pd
@@ -10,8 +10,17 @@ from langs import LANGUAGES
 
 def get_data_hash(df):
     """Generates a unique fingerprint for the dataframe content."""
-    # We convert the dataframe to a byte string to hash it
     return hashlib.md5(pd.util.hash_pandas_object(df).values).hexdigest()
+
+
+@st.cache_data(ttl=3600)
+def get_exchange_rate():
+    """Fetches the current USD/BRL exchange rate from Yahoo Finance."""
+    try:
+        data = yf.download("USDBRL=X", period="1d", progress=False)
+        return float(data['Close'].iloc[-1])
+    except:
+        return 5.0  # Fallback
 
 
 def clean_ticker(text):

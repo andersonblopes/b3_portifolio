@@ -13,6 +13,9 @@ LANGUAGES = {
         'earnings_title': 'Top Earnings by Ticker',
         'detailed_title': 'Detailed Portfolio Position',
         'download_btn': '📥 Download Consolidated Excel',
+        'warning_duplicate': '⚠️ No new data detected. This file has already been processed.',
+        'currency_label': 'Display Currency',
+        'exchange_rate_msg': 'Exchange Rate',
         # Table Headers
         'col_ticker': 'Ticker',
         'col_category': 'Category',
@@ -22,14 +25,13 @@ LANGUAGES = {
         'col_earnings': 'Earnings',
         'col_curr_price': 'Current Price',
         'col_yield': 'Yield (%)',
-        'col_pnl': 'P&L (Realized/Unrealized)',
+        'col_pnl': 'P&L',
         # Categories
         'cat_treasury': 'Treasury Bonds',
         'cat_reits': 'REITs (FIIs)',
         'cat_stocks': 'Stocks',
         'cat_fixed': 'Fixed Income',
-        'cat_others': 'ETFs/Units',
-        'warning_duplicate': '⚠️ No new data detected. This file has already been processed.',
+        'cat_others': 'ETFs/Units'
     },
     'Português (Brasil)': {
         'settings': 'Configurações',
@@ -44,6 +46,9 @@ LANGUAGES = {
         'earnings_title': 'Maiores Proventos por Ticker',
         'detailed_title': 'Posição Detalhada da Carteira',
         'download_btn': '📥 Baixar Excel Consolidado',
+        'warning_duplicate': '⚠️ Nenhum dado novo detectado. Este arquivo já foi processado.',
+        'currency_label': 'Moeda de Exibição',
+        'exchange_rate_msg': 'Taxa de Câmbio',
         # Cabeçalhos da Tabela
         'col_ticker': 'Ticker',
         'col_category': 'Categoria',
@@ -59,7 +64,6 @@ LANGUAGES = {
         'cat_reits': 'FIIs',
         'cat_stocks': 'Ações',
         'cat_fixed': 'Renda Fixa',
-        'cat_others': 'ETFs/Units',
-        'warning_duplicate': '⚠️ Nenhum dado novo detectado. Este arquivo já foi processado.',
+        'cat_others': 'ETFs/Units'
     }
 }
