@@ -16,14 +16,14 @@ statements. It provides real-time portfolio tracking, dividend analysis, and aut
 
 ```text
 b3_importer/
-├── requirements.txt
+├── setup.sh            # (The script goes here)
+├── requirements.txt    # Project dependencies
+├── .gitignore          # Git exclusion rules (IDE, Data, Cache)
+└── README.md           # Documentation
 └── src/
     ├── app.py          # Main Streamlit application
     ├── utils.py        # Utility functions for data processing
     └── langs.py        # Language support (i18n)
-├── .gitignore          # Git exclusion rules (IDE, Data, Cache)
-├── requirements.txt    # Project dependencies
-└── README.md           # Documentation
 
 ```
 
