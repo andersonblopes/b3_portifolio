@@ -1,0 +1,57 @@
+# === PERSONAL DATA & DOCUMENTS ===
+# Blocks financial statements and spreadsheets containing private data
+data/*.xlsx
+data/*.xls
+data/*.csv
+*.xlsx
+*.xls
+*.csv
+# Blocks PDFs (brokerage notes/reports)
+*.pdf
+
+# === PYTHON (GENERAL) ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.toast
+.buildpath
+.target
+.settings/
+.project
+.pydevproject
+
+# === IDE: INTELLIJ / PYCHARM ===
+# JetBrains IDE configuration folder
+.idea/
+*.iml
+*.iws
+*.ipr
+cmake-build-*/
+
+# === IDE: VS CODE ===
+# Editor local configuration and history
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/
+*.code-workspace
+# === STREAMLIT ===
+# Local cache and secrets
+.streamlit/
+# ...BUT allow the config file to be committed
+!.streamlit/config.toml
+# If you wish to share the theme but hide secrets:
+.streamlit/secrets.toml
+# === OPERATING SYSTEM ===
+.DS_Store
+Thumbs.db
+desktop.ini
