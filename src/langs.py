@@ -1,4 +1,3 @@
-# --- COMPREHENSIVE I18N DICTIONARY ---
 LANGUAGES = {
     'English': {
         'settings': 'Settings',
@@ -14,13 +13,10 @@ LANGUAGES = {
         'evolution_title': 'Wealth Evolution (Invested Capital)',
         'monthly_earnings_title': 'Monthly Passive Income',
         'detailed_title': 'Asset Detail Breakdown',
-        'download_btn': '📥 Download Report',
         'warning_duplicate': '⚠️ Data already up to date.',
         'currency_label': 'Display Currency',
         'exchange_rate_msg': 'Market Rate',
         'status_loaded': '✅ Data loaded',
-        'status_waiting': '📥 Waiting for files',
-        # Table Headers
         'col_ticker': 'Asset',
         'col_category': 'Type',
         'col_qty': 'Shares',
@@ -30,7 +26,6 @@ LANGUAGES = {
         'col_curr_price': 'Live Price',
         'col_yield': 'Return',
         'col_pnl': 'Net Result',
-        # Categories
         'cat_treasury': 'Bonds',
         'cat_reits': 'REITs',
         'cat_stocks': 'Stocks',
@@ -51,13 +46,10 @@ LANGUAGES = {
         'evolution_title': 'Evolução Patrimonial (Investido)',
         'monthly_earnings_title': 'Fluxo de Renda Mensal',
         'detailed_title': 'Detalhamento por Ativo',
-        'download_btn': '📥 Baixar Relatório',
         'warning_duplicate': '⚠️ Dados já processados.',
         'currency_label': 'Moeda de Exibição',
         'exchange_rate_msg': 'Cotação Mercado',
         'status_loaded': '✅ Dados carregados',
-        'status_waiting': '📥 Aguardando arquivos',
-        # Cabeçalhos
         'col_ticker': 'Ativo',
         'col_category': 'Tipo',
         'col_qty': 'Qtd',
@@ -67,7 +59,6 @@ LANGUAGES = {
         'col_curr_price': 'Cotação Atual',
         'col_yield': 'Rent.',
         'col_pnl': 'Resultado',
-        # Categorias
         'cat_treasury': 'Tesouro',
         'cat_reits': 'FIIs',
         'cat_stocks': 'Ações',

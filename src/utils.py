@@ -61,7 +61,7 @@ def load_and_process_files(uploaded_files):
 def get_asset_category(ticker, product_name, lang_code):
     t, p = str(ticker).upper(), str(product_name).upper()
     trans = LANGUAGES[lang_code]
-    if 'TESOURO' in p or 'TREASURY' in p: return trans['cat_treasury']
+    if 'TESOURO' in p: return trans['cat_treasury']
     if t.endswith('11'): return trans['cat_reits']
     if any(t.endswith(s) for s in ['3', '4', '5', '6']): return trans['cat_stocks']
     return trans['cat_others']
