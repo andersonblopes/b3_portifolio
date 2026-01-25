@@ -124,7 +124,7 @@ if st.session_state['raw_df'] is not None:
             mkt_val_label: f'{curr_symbol} ' + '{:.2f}',
             C['col_pnl']: f'{curr_symbol} ' + '{:.2f}',
             C['col_earnings']: f'{curr_symbol} ' + '{:.2f}',
-            C['col_qty']: '{:,.2f}',
+            C['col_qty']: '{:,.0f}',
             C['col_yield']: '{:.2f}%'
         }).background_gradient(subset=[C['col_yield']], cmap='RdYlGn'), use_container_width=True, hide_index=True)
 
