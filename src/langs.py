@@ -1,7 +1,6 @@
 LANGUAGES = {
     'English': {
         'upload_msg': 'Import B3 Statements (Negotiation/Movement)',
-        'welcome_msg': 'Ready to track your wealth journey?',
         'welcome_sub': '💡 Upload Negotiation for custody and Movement for earnings.',
         'total_invested': 'Total Invested',
         'market_value': 'Portfolio Value',
@@ -14,11 +13,13 @@ LANGUAGES = {
         'tab_earnings': 'Earnings History',
         'earnings_audit_title': 'Detailed Earnings Log',
         'chart_evolution': 'Wealth Evolution',
-        'chart_allocation': 'Allocation by Type',
+        'chart_allocation': 'Allocation by Asset Type',
         'chart_earn_monthly': 'Monthly Income Evolution',
         'chart_earn_type': 'Earnings by Type',
         'chart_earn_asset_type': 'Earnings by Asset Type',
         'chart_earn_ticker': 'Top Payers (Assets)',
+        'chart_earn_inst': 'Earnings by Institution',
+        'chart_asset_inst': 'Assets by Institution',
         'col_ticker': 'Asset',
         'col_type': 'Asset Type',
         'col_earning_type': 'Earning Type',
@@ -31,11 +32,11 @@ LANGUAGES = {
         'col_earnings': 'Earnings',
         'col_status': 'Status',
         'col_date': 'Date',
+        'col_inst': 'Institution',
         'status_legend': '💡 ✅ Live Price | ⚠️ Using Average Cost.'
     },
     'Português (Brasil)': {
         'upload_msg': 'Importar Arquivos B3 (Negociação/Movimentação)',
-        'welcome_msg': 'Pronto para acompanhar sua jornada?',
         'welcome_sub': '💡 Suba Negociação para custódia e Movimentação para proventos.',
         'total_invested': 'Total Investido',
         'market_value': 'Patrimônio Atual',
@@ -48,11 +49,13 @@ LANGUAGES = {
         'tab_earnings': 'Histórico de Proventos',
         'earnings_audit_title': 'Log Detalhado de Lançamentos',
         'chart_evolution': 'Evolução Patrimonial',
-        'chart_allocation': 'Alocação por Tipo',
+        'chart_allocation': 'Alocação por Tipo de Ativo',
         'chart_earn_monthly': 'Evolução da Renda Mensal',
         'chart_earn_type': 'Proventos por Tipo',
         'chart_earn_asset_type': 'Proventos por Tipo de Ativo',
         'chart_earn_ticker': 'Maiores Pagadores (Ativos)',
+        'chart_earn_inst': 'Proventos por Instituição',
+        'chart_asset_inst': 'Patrimônio por Instituição',
         'col_ticker': 'Ativo',
         'col_type': 'Tipo Ativo',
         'col_earning_type': 'Tipo Provento',
@@ -65,6 +68,7 @@ LANGUAGES = {
         'col_earnings': 'Proventos',
         'col_status': 'Status',
         'col_date': 'Data',
+        'col_inst': 'Instituição',
         'status_legend': '💡 ✅ Preço Real | ⚠️ Usando Preço Médio.'
     }
 }

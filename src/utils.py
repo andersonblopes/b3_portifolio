@@ -44,6 +44,7 @@ def load_and_process_files(uploaded_files):
             temp['ticker'] = df['Código de Negociação'].apply(clean_ticker)
             temp['qty'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(0)
             temp['val'] = pd.to_numeric(df['Valor'], errors='coerce').fillna(0)
+            temp['inst'] = df['Instituição'].fillna('Desconhecida')
             temp['type'] = df['Tipo de Movimentação'].apply(lambda x: 'BUY' if 'Compra' in str(x) else 'SELL')
             temp['source'] = 'NEG'
             all_data.append(temp)
@@ -59,6 +60,7 @@ def load_and_process_files(uploaded_files):
                 temp['date'] = pd.to_datetime(df['Data'], dayfirst=True)
                 temp['ticker'] = df['Produto'].apply(clean_ticker)
                 temp['val'] = pd.to_numeric(df['Valor da Operação'], errors='coerce').fillna(0)
+                temp['inst'] = df['Instituição'].fillna('Desconhecida')
 
                 def map_earn(m):
                     terms = ['RENDIMENTO', 'DIVIDENDO', 'JCP', 'JUROS SOBRE', 'AMORTIZA']
