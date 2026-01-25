@@ -42,21 +42,19 @@ if st.session_state.raw_df is not None:
     portfolio_main['pnl'] = portfolio_main['v_mercado'] - portfolio_main['total_cost']
     portfolio_main['yield'] = (portfolio_main['pnl'] / portfolio_main['total_cost'] * 100)
 
-    # KPIs
-    inv, mkt, earn = portfolio_main['total_cost'].sum(), portfolio_main['v_mercado'].sum(), portfolio_main[
-        'earnings'].sum()
+    # KPIs Totais
+    inv_total, mkt_total = portfolio_main['total_cost'].sum(), portfolio_main['v_mercado'].sum()
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric(texts['total_invested'], fmt_reg(inv));
-    k2.metric(texts['market_value'], fmt_reg(mkt), f"{(mkt / inv - 1) * 100:.2f}%")
-    k3.metric(texts['gross_pnl'], fmt_reg(mkt - inv));
-    if has_earnings: k4.metric(texts['total_earnings'], fmt_reg(earn))
+    k1.metric(texts['total_invested'], fmt_reg(inv_total))
+    k2.metric(texts['market_value'], fmt_reg(mkt_total), f"{(mkt_total / inv_total - 1) * 100:.2f}%")
+    k3.metric(texts['gross_pnl'], fmt_reg(mkt_total - inv_total))
+    if has_earnings: k4.metric(texts['total_earnings'], fmt_reg(portfolio_main['earnings'].sum()))
 
     tabs = st.tabs(
         [f"📊 {texts['tab_visuals']}", f"📝 {texts['tab_data']}", f"💰 {texts['tab_earnings']}"] if has_earnings else [
             f"📊 {texts['tab_visuals']}", f"📝 {texts['tab_data']}"])
 
-    with tabs[0]:  # Dashboard Global - TODOS OS GRÁFICOS AQUI
-        # LINHA 1: Evolução Global e Alocação por Tipo
+    with tabs[0]:  # Dashboard
         c1, c2 = st.columns(2)
         df_ev = raw_df[raw_df['source'] == 'NEG'].copy()
         if not df_ev.empty:
@@ -69,10 +67,8 @@ if st.session_state.raw_df is not None:
             charts.plot_allocation(portfolio_main, 'asset_type', 'v_mercado', is_usd, texts['chart_allocation']),
             use_container_width=True)
 
-        # LINHA 2: Patrimônio por Instituição e Evolução da Renda
-        st.divider()
+        st.divider();
         c3, c4 = st.columns(2)
-        # Patrimônio por Inst
         df_inst = raw_df[raw_df['source'] == 'NEG'].groupby('inst')['val'].sum().reset_index();
         df_inst['val'] *= factor
         c3.plotly_chart(charts.plot_allocation(df_inst, 'inst', 'val', is_usd, texts['chart_asset_inst']),
@@ -81,52 +77,63 @@ if st.session_state.raw_df is not None:
         if has_earnings:
             earn_raw = raw_df[raw_df['type'] == 'EARNINGS'].copy();
             earn_raw['val'] *= factor
-            # Renda Mensal
-            df_m = earn_raw.copy();
-            df_m['month_year'] = df_m['date'].dt.strftime('%Y-%m')
-            res_m = df_m.groupby('month_year')['val'].sum().reset_index().sort_values('month_year')
+            res_m = earn_raw.copy();
+            res_m['month_year'] = res_m['date'].dt.strftime('%Y-%m')
+            res_m = res_m.groupby('month_year')['val'].sum().reset_index().sort_values('month_year')
             c4.plotly_chart(charts.plot_earnings_evolution(res_m, sym, is_usd, texts['chart_earn_monthly']),
                             use_container_width=True)
 
-            # LINHA 3: Renda por Instituição e Maiores Pagadores
-            st.divider()
+            st.divider();
             c5, c6 = st.columns(2)
-            # Renda por Inst
             earn_inst = earn_raw.groupby('inst')['val'].sum().reset_index()
             c5.plotly_chart(charts.plot_allocation(earn_inst, 'inst', 'val', is_usd, texts['chart_earn_inst']),
                             use_container_width=True)
-            # Ranking Maiores Pagadores
             earn_ticker = earn_raw.groupby('ticker')['val'].sum().reset_index()
             c6.plotly_chart(charts.plot_bar_earnings_horizontal(earn_ticker, 'ticker', 'val', sym, is_usd,
                                                                 texts['chart_earn_ticker']), use_container_width=True)
 
-    with tabs[1]:  # Data Lab
-        st.dataframe(portfolio_main.rename(
-            columns={'ticker': texts['col_ticker'], 'asset_type': texts['col_type'], 'qty': texts['col_qty'],
-                     'avg_price': texts['col_avg_price'], 'total_cost': texts['col_total_cost'],
-                     'p_atual': texts['col_curr_price'], 'v_mercado': texts['market_value'], 'pnl': texts['col_pnl'],
-                     'yield': texts['col_yield'], 'status': texts['col_status'],
-                     'earnings': texts['col_earnings']}).style.format(
-            {texts['col_qty']: "{:.0f}", texts['col_yield']: "{:.2f}%", texts['col_avg_price']: fmt_reg,
-             texts['col_curr_price']: fmt_reg, texts['col_total_cost']: fmt_reg, texts['market_value']: fmt_reg,
-             texts['col_pnl']: fmt_reg, texts['col_earnings']: fmt_reg}).background_gradient(
-            subset=[texts['col_yield']], cmap='RdYlGn', vmin=-15, vmax=15), use_container_width=True, hide_index=True)
+    with tabs[1]:  # Data Lab - Título Consolidado
+        st.write(texts['status_legend'])
+        types = sorted(portfolio_main['asset_type'].unique())
+
+        display_cols = {
+            'ticker': texts['col_ticker'], 'qty': texts['col_qty'], 'avg_price': texts['col_avg_price'],
+            'total_cost': texts['col_total_cost'], 'p_atual': texts['col_curr_price'],
+            'v_mercado': texts['market_value'],
+            'pnl': texts['col_pnl'], 'yield': texts['col_yield'], 'status': texts['col_status'],
+            'earnings': texts['col_earnings']
+        }
+
+        for t in types:
+            sub_df = portfolio_main[portfolio_main['asset_type'] == t].copy()
+            t_mkt = sub_df['v_mercado'].sum()
+            weight = (t_mkt / mkt_total) * 100 if mkt_total > 0 else 0
+
+            # Título único consolidado conforme solicitado
+            title = f"📁 {t} | {len(sub_df)} ativos | {fmt_reg(t_mkt)} ({weight:.2f}%)"
+
+            with st.expander(title, expanded=True):
+                st.dataframe(sub_df[list(display_cols.keys())].rename(columns=display_cols).style.format({
+                    texts['col_qty']: "{:.0f}", texts['col_yield']: "{:.2f}%", texts['col_avg_price']: fmt_reg,
+                    texts['col_curr_price']: fmt_reg, texts['col_total_cost']: fmt_reg, texts['market_value']: fmt_reg,
+                    texts['col_pnl']: fmt_reg, texts['col_earnings']: fmt_reg
+                }).background_gradient(subset=[texts['col_yield']], cmap='RdYlGn', vmin=-15, vmax=15),
+                             use_container_width=True, hide_index=True)
 
     if has_earnings:
-        with tabs[2]:  # Aba Proventos Detalhada
+        with tabs[2]:  # Proventos
             earn_raw = raw_df[raw_df['type'] == 'EARNINGS'].copy();
             earn_raw['val'] *= factor
             r1_c1, r1_c2 = st.columns(2)
             with r1_c1:
-                e_type = earn_raw.groupby('sub_type')['val'].sum().reset_index()
-                st.plotly_chart(charts.plot_allocation(e_type, 'sub_type', 'val', is_usd, texts['chart_earn_type']),
-                                use_container_width=True)
+                st.plotly_chart(
+                    charts.plot_allocation(earn_raw.groupby('sub_type')['val'].sum().reset_index(), 'sub_type', 'val',
+                                           is_usd, texts['chart_earn_type']), use_container_width=True)
             with r1_c2:
                 earn_raw['at_type'] = earn_raw['ticker'].apply(utils.detect_asset_type)
-                e_asset = earn_raw.groupby('at_type')['val'].sum().reset_index()
                 st.plotly_chart(
-                    charts.plot_allocation(e_asset, 'at_type', 'val', is_usd, texts['chart_earn_asset_type']),
-                    use_container_width=True)
+                    charts.plot_allocation(earn_raw.groupby('at_type')['val'].sum().reset_index(), 'at_type', 'val',
+                                           is_usd, texts['chart_earn_asset_type']), use_container_width=True)
 
             st.divider();
             st.subheader(texts['earnings_audit_title'])
