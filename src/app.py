@@ -84,9 +84,28 @@ if uploaded_files:
                 hide_index=True)
 
         if has_earnings:
-            with tabs[2]:
-                earn_df = utils.calculate_monthly_earnings(raw_df, factor)
-                st.plotly_chart(charts.plot_earnings_evolution(earn_df, sym, is_usd, texts['tab_earnings']),
+            with tabs[2]:  # Aba Histórico de Proventos
+                earn_monthly = utils.calculate_monthly_earnings(raw_df, factor)
+                st.plotly_chart(charts.plot_earnings_evolution(earn_monthly, sym, is_usd, texts['tab_earnings']),
                                 use_container_width=True)
+
+                st.divider()
+                st.subheader(texts['earnings_audit_title'])
+
+                # Tabela de Auditoria com Tipo de Rendimento
+                audit_df = raw_df[raw_df['type'] == 'EARNINGS'].copy()
+                audit_df['val'] *= factor
+                audit_df = audit_df.rename(columns={
+                    'date': texts['col_date'],
+                    'ticker': texts['col_ticker'],
+                    'val': texts['col_earnings'],
+                    'sub_type': texts['col_earning_type']
+                })
+
+                st.dataframe(audit_df[[texts['col_date'], texts['col_ticker'], texts['col_earning_type'],
+                                       texts['col_earnings']]].style.format({
+                    texts['col_date']: lambda x: x.strftime('%d/%m/%Y'),
+                    texts['col_earnings']: fmt_reg
+                }), use_container_width=True, hide_index=True)
 else:
     st.info(texts['welcome_sub'])
