@@ -1,11 +1,15 @@
 import hashlib
 import re
+import warnings
 
 import pandas as pd
 import streamlit as st
 import yfinance as yf
 
 from langs import LANGUAGES
+
+# Filter out the specific openpyxl style warning
+warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
 
 def get_data_hash(df):
@@ -16,7 +20,7 @@ def get_data_hash(df):
 def get_exchange_rate():
     try:
         data = yf.download("USDBRL=X", period="1d", progress=False)
-        return float(data['Close'].iloc[-1])
+        return data['Close'].iloc[-1].item()
     except:
         return 5.45
 
@@ -122,7 +126,7 @@ def fetch_market_prices(tickers, lang_code):
     for i, t in enumerate(tickers):
         try:
             data = yf.download(f"{t}.SA", period="1d", progress=False, threads=False)
-            prices[t] = float(data['Close'].iloc[-1]) if not data.empty else None
+            prices[t] = data['Close'].iloc[-1].item() if not data.empty else None
         except:
             prices[t] = None
         p_bar.progress((i + 1) / len(tickers))
