@@ -23,7 +23,7 @@ source $VENV_NAME/bin/activate
 # 3. Install/Update Dependencies (Including Watchdog)
 echo "📥 Syncing dependencies..."
 pip install --upgrade pip
-pip install streamlit pandas yfinance plotly openpyxl matplotlib watchdog
+pip install -r requirements.txt
 
 # 4. Final Path Check and Run
 if [ -f "$APP_PATH" ]; then
