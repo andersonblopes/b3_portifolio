@@ -55,20 +55,36 @@ if uploaded_files:
         k3.metric(texts['gross_pnl'], fmt_reg(mkt - inv))
         if has_earnings: k4.metric(texts['total_earnings'], fmt_reg(earn))
 
-        # ABAS
-        t_titles = [f"📊 {texts['tab_visuals']}", f"📝 {texts['tab_data']}"]
-        if has_earnings: t_titles.append(f"💰 {texts['tab_earnings']}")
-        tabs = st.tabs(t_titles)
+        tabs = st.tabs(
+            [f"📊 {texts['tab_visuals']}", f"📝 {texts['tab_data']}", f"💰 {texts['tab_earnings']}"] if has_earnings else [
+                f"📊 {texts['tab_visuals']}", f"📝 {texts['tab_data']}"])
 
-        with tabs[0]:  # Dashboard
-            c_left, c_right = st.columns(2)
+        with tabs[0]:  # Dashboard Global
+            # Wealth Section
+            c1, c2 = st.columns(2)
             ev_df = utils.calculate_evolution(raw_df, factor)
             if not ev_df.empty:
-                c_left.plotly_chart(charts.plot_evolution(ev_df, sym, is_usd, texts['chart_evolution']),
-                                    use_container_width=True)
-            c_right.plotly_chart(
+                c1.plotly_chart(charts.plot_evolution(ev_df, sym, is_usd, texts['chart_evolution']),
+                                use_container_width=True)
+            c2.plotly_chart(
                 charts.plot_allocation(portfolio_main, 'asset_type', 'v_mercado', is_usd, texts['chart_allocation']),
                 use_container_width=True)
+
+            if has_earnings:
+                st.divider()
+                # Earnings Section in Dashboard
+                c3, c4 = st.columns(2)
+                earn_monthly = utils.calculate_monthly_earnings(raw_df, factor)
+                c3.plotly_chart(charts.plot_earnings_evolution(earn_monthly, sym, is_usd, texts['chart_earn_monthly']),
+                                use_container_width=True)
+
+                earn_raw = raw_df[raw_df['type'] == 'EARNINGS'].copy()
+                earn_raw['val'] *= factor
+                earn_ticker = earn_raw.groupby('ticker')['val'].sum().reset_index()
+                # Ranking Horizontal
+                c4.plotly_chart(charts.plot_bar_earnings_horizontal(earn_ticker, 'ticker', 'val', sym, is_usd,
+                                                                    texts['chart_earn_ticker']),
+                                use_container_width=True)
 
         with tabs[1]:  # Data Lab
             st.dataframe(portfolio_main.rename(
@@ -84,28 +100,30 @@ if uploaded_files:
                 hide_index=True)
 
         if has_earnings:
-            with tabs[2]:  # Aba Histórico de Proventos
-                earn_monthly = utils.calculate_monthly_earnings(raw_df, factor)
-                st.plotly_chart(charts.plot_earnings_evolution(earn_monthly, sym, is_usd, texts['tab_earnings']),
-                                use_container_width=True)
+            with tabs[2]:  # Aba Detalhada de Proventos
+                earn_raw = raw_df[raw_df['type'] == 'EARNINGS'].copy()
+                earn_raw['val'] *= factor
+                earn_raw['asset_type'] = earn_raw['ticker'].apply(utils.detect_asset_type)
+
+                row1_c1, row1_c2 = st.columns(2)
+                with row1_c1:
+                    earn_type = earn_raw.groupby('sub_type')['val'].sum().reset_index()
+                    st.plotly_chart(
+                        charts.plot_pie_earnings(earn_type, 'sub_type', 'val', is_usd, texts['chart_earn_type']),
+                        use_container_width=True)
+                with row1_c2:
+                    earn_asset_type = earn_raw.groupby('asset_type')['val'].sum().reset_index()
+                    st.plotly_chart(charts.plot_pie_earnings(earn_asset_type, 'asset_type', 'val', is_usd,
+                                                             texts['chart_earn_asset_type']), use_container_width=True)
 
                 st.divider()
                 st.subheader(texts['earnings_audit_title'])
-
-                # Tabela de Auditoria com Tipo de Rendimento
-                audit_df = raw_df[raw_df['type'] == 'EARNINGS'].copy()
-                audit_df['val'] *= factor
-                audit_df = audit_df.rename(columns={
-                    'date': texts['col_date'],
-                    'ticker': texts['col_ticker'],
-                    'val': texts['col_earnings'],
-                    'sub_type': texts['col_earning_type']
-                })
-
+                audit_df = earn_raw.rename(
+                    columns={'date': texts['col_date'], 'ticker': texts['col_ticker'], 'val': texts['col_earnings'],
+                             'sub_type': texts['col_earning_type']})
                 st.dataframe(audit_df[[texts['col_date'], texts['col_ticker'], texts['col_earning_type'],
-                                       texts['col_earnings']]].style.format({
-                    texts['col_date']: lambda x: x.strftime('%d/%m/%Y'),
-                    texts['col_earnings']: fmt_reg
-                }), use_container_width=True, hide_index=True)
+                                       texts['col_earnings']]].style.format(
+                    {texts['col_date']: lambda x: x.strftime('%d/%m/%Y'), texts['col_earnings']: fmt_reg}),
+                    use_container_width=True, hide_index=True)
 else:
     st.info(texts['welcome_sub'])

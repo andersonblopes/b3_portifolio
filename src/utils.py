@@ -47,7 +47,6 @@ def load_and_process_files(uploaded_files):
             temp['qty'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(0)
             temp['val'] = pd.to_numeric(df['Valor'], errors='coerce').fillna(0)
             temp['type'] = df['Tipo de Movimentação'].apply(lambda x: 'BUY' if 'Compra' in str(x) else 'SELL')
-            temp['sub_type'] = df['Tipo de Movimentação']
             temp['source'] = 'NEG'
             all_data.append(temp)
         else:
@@ -63,16 +62,20 @@ def load_and_process_files(uploaded_files):
                 temp['ticker'] = df['Produto'].apply(clean_ticker)
                 temp['val'] = pd.to_numeric(df['Valor da Operação'], errors='coerce').fillna(0)
 
+                def map_earn(m):
+                    terms = ['RENDIMENTO', 'DIVIDENDO', 'JCP', 'JUROS SOBRE', 'AMORTIZA']
+                    return 'EARNINGS' if any(t in str(m).upper() for t in terms) else 'IGNORE'
+
+                temp['type'] = df['Movimentação'].apply(map_earn)
+
                 def classify_earning(m):
                     m_upper = str(m).upper()
                     if 'DIVIDENDO' in m_upper: return 'Dividendo'
                     if 'JUROS SOBRE' in m_upper or 'JCP' in m_upper: return 'JCP'
                     if 'AMORTIZA' in m_upper: return 'Amortização'
-                    if 'RENDIMENTO' in m_upper: return 'Rendimento'
-                    return None
+                    return 'Rendimento'
 
                 temp['sub_type'] = df['Movimentação'].apply(classify_earning)
-                temp['type'] = temp['sub_type'].apply(lambda x: 'EARNINGS' if x else 'IGNORE')
                 temp['source'] = 'MOV'
                 all_data.append(temp[temp['type'] == 'EARNINGS'])
     return pd.concat(all_data).sort_values(by='date', ascending=False) if all_data else pd.DataFrame()
@@ -94,10 +97,8 @@ def calculate_portfolio(df):
             elif row['type'] == 'EARNINGS':
                 earnings += row['val']
         if round(qty, 4) > 0 or earnings > 0:
-            summary.append({
-                'ticker': ticker, 'qty': qty, 'avg_price': cost / qty if qty > 0 else 0,
-                'total_cost': cost, 'earnings': earnings, 'asset_type': detect_asset_type(ticker)
-            })
+            summary.append({'ticker': ticker, 'qty': qty, 'avg_price': cost / qty if qty > 0 else 0, 'total_cost': cost,
+                            'earnings': earnings, 'asset_type': detect_asset_type(ticker)})
     return pd.DataFrame(summary)
 
 
