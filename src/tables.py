@@ -2,7 +2,6 @@ import streamlit as st
 
 
 def render_portfolio_table(df, texts, fmt_func):
-    """Renderiza a tabela estilizada de ativos no Data Lab."""
     display_cols = {
         'ticker': texts['col_ticker'], 'qty': texts['col_qty'], 'avg_price': texts['col_avg_price'],
         'total_cost': texts['col_total_cost'], 'p_atual': texts['col_curr_price'], 'v_mercado': texts['market_value'],
@@ -10,7 +9,7 @@ def render_portfolio_table(df, texts, fmt_func):
         'earnings': texts['col_earnings']
     }
 
-    return st.dataframe(
+    st.dataframe(
         df[list(display_cols.keys())].rename(columns=display_cols).style.format({
             texts['col_qty']: "{:.0f}",
             texts['col_yield']: "{:.2f}%",
@@ -27,7 +26,6 @@ def render_portfolio_table(df, texts, fmt_func):
 
 
 def render_earnings_log(df, texts, fmt_func):
-    """Renderiza a tabela de auditoria detalhada de proventos."""
     audit_df = df.rename(columns={
         'date': texts['col_date'],
         'ticker': texts['col_ticker'],
@@ -36,7 +34,7 @@ def render_earnings_log(df, texts, fmt_func):
         'inst': texts['col_inst']
     })
 
-    return st.dataframe(
+    st.dataframe(
         audit_df[[texts['col_date'], texts['col_ticker'], texts['col_inst'], texts['col_earning_type'],
                   texts['col_earnings']]].style.format({
             texts['col_date']: lambda x: x.strftime('%d/%m/%Y'),

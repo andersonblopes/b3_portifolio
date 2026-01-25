@@ -33,7 +33,9 @@ LANGUAGES = {
         'col_status': 'Status',
         'col_date': 'Date',
         'col_inst': 'Institution',
-        'status_legend': '💡 ✅ Live Price | ⚠️ Using Average Cost.'
+        'status_legend': '💡 ✅ Live Price | ⚠️ Using Average Cost.',
+        'assets_count': 'assets',
+        'weight_label': 'weight'
     },
     'Português (Brasil)': {
         'upload_msg': 'Importar Arquivos B3 (Negociação/Movimentação)',
@@ -69,6 +71,8 @@ LANGUAGES = {
         'col_status': 'Status',
         'col_date': 'Data',
         'col_inst': 'Instituição',
-        'status_legend': '💡 ✅ Preço Real | ⚠️ Usando Preço Médio.'
+        'status_legend': '💡 ✅ Preço Real | ⚠️ Usando Preço Médio.',
+        'assets_count': 'ativos',
+        'weight_label': 'peso'
     }
 }

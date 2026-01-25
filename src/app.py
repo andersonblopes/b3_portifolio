@@ -10,11 +10,10 @@ st.set_page_config(page_title="B3 Master", layout="wide", page_icon="📈")
 if 'raw_df' not in st.session_state:
     st.session_state.raw_df = None
 
-# --- SIDEBAR ---
+# Sidebar
 lang_choice = st.sidebar.selectbox("🌐 Idioma", ["Português (Brasil)", "English"])
 texts = LANGUAGES[lang_choice]
 currency_choice = st.sidebar.radio(texts['currency_label'], ["BRL (R$)", "USD ($)"])
-
 rate = utils.get_exchange_rate()
 st.sidebar.metric(label=texts['exchange_rate_msg'], value=f"R$ {rate:.2f}")
 
@@ -22,16 +21,12 @@ is_usd = currency_choice == "USD ($)"
 sym, factor = ("$", 1 / rate) if is_usd else ("R$", 1.0)
 
 
-# Função central de formatação de moeda
-def fmt_reg(v):
-    return f"{sym} {v:.2f}".replace('.', ',' if not is_usd else '.')
+def fmt_reg(v): return f"{sym} {v:.2f}".replace('.', ',' if not is_usd else '.')
 
 
 uploaded_files = st.sidebar.file_uploader(texts['upload_msg'], type=['xlsx'], accept_multiple_files=True)
-if uploaded_files:
-    st.session_state.raw_df = utils.load_and_process_files(uploaded_files)
+if uploaded_files: st.session_state.raw_df = utils.load_and_process_files(uploaded_files)
 
-# --- LOGICA DE EXIBIÇÃO ---
 if st.session_state.raw_df is not None:
     raw_df = st.session_state.raw_df
     portfolio = utils.calculate_portfolio(raw_df)
@@ -110,7 +105,10 @@ if st.session_state.raw_df is not None:
             sub_df = portfolio_main[portfolio_main['asset_type'] == t].copy()
             t_mkt = sub_df['v_mercado'].sum()
             weight = (t_mkt / mkt_total) * 100 if mkt_total > 0 else 0
-            title = f"📁 {t} | {len(sub_df)} ativos | {fmt_reg(t_mkt)} ({weight:.2f}%)"
+
+            # Título dinâmico e traduzido do expansor
+            label_assets = texts['assets_count']
+            title = f"📁 {t} | {len(sub_df)} {label_assets} | {fmt_reg(t_mkt)} ({weight:.2f}%)"
 
             with st.expander(title, expanded=True):
                 tables.render_portfolio_table(sub_df, texts, fmt_reg)
