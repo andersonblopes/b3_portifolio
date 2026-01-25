@@ -22,6 +22,8 @@ The project follows a clean, modular architecture:
 ```text
 b3_importer/
 ├── src/
+│   ├── charts.py       # Visualization components
+│   ├── tables.py       # Data tables and summaries
 │   ├── app.py          # Dashboard UI and layout
 │   ├── utils.py        # Financial logic and API integrations
 │   └── langs.py        # Internationalization dictionaries
