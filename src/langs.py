@@ -36,7 +36,9 @@ LANGUAGES = {
         'cat_reits': 'REITs',
         'cat_stocks': 'Stocks',
         'cat_fixed': 'Fixed Income',
-        'cat_others': 'Others'
+        'cat_others': 'Others',
+        'status_legend': '💡 **Legend:** ✅ Live Price from Yahoo Finance | ⚠️ Price not found (using Average Cost as fallback).',
+        'col_status': 'Status',
     },
     'Português (Brasil)': {
         'settings': 'Configurações',
@@ -75,6 +77,8 @@ LANGUAGES = {
         'cat_reits': 'FIIs',
         'cat_stocks': 'Ações',
         'cat_fixed': 'Renda Fixa',
-        'cat_others': 'Outros'
+        'cat_others': 'Outros',
+        'status_legend': '💡 **Legenda:** ✅ Preço Real via Yahoo Finance | ⚠️ Preço não encontrado (usando Preço Médio).',
+        'col_status': 'Status',
     }
 }

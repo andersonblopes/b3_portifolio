@@ -49,16 +49,32 @@ if uploaded_files:
 
 # --- 5. MAIN CONTENT ---
 if st.session_state['raw_df'] is not None:
-    # ... (Keep your existing Dashboard State code here) ...
     raw_df = st.session_state['raw_df'].copy()
     st.sidebar.success(texts['status_loaded'])
 
-    # [Rest of your calculation and tab logic remains the same]
     portfolio = utils.calculate_portfolio(raw_df, lang_choice)
     C = {k: texts[k] for k in texts if k.startswith('col_')}
-    prices_brl = utils.fetch_market_prices(portfolio[C['col_ticker']].tolist(), lang_choice)
-    portfolio[C['col_curr_price']] = (portfolio[C['col_ticker']].map(prices_brl).fillna(
-        portfolio[C['col_avg_price']])) * conv_factor
+
+    # Fetch Market Data with Metadata
+    prices_data = utils.fetch_market_prices(portfolio[C['col_ticker']].tolist(), lang_choice)
+
+
+    # Logic to map Live/Stale status
+    def process_price_info(ticker):
+        info = prices_data.get(ticker, {"price": None, "is_live": False})
+        if info["is_live"]:
+            return info["price"], "✅"
+        else:
+            # Fallback to Average Price
+            avg_p = portfolio.loc[portfolio[C['col_ticker']] == ticker, C['col_avg_price']].values[0]
+            return avg_p, "⚠️"
+
+
+    price_results = portfolio[C['col_ticker']].apply(process_price_info)
+    portfolio[C['col_curr_price']] = [x[0] * conv_factor for x in price_results]
+    portfolio[texts['col_status']] = [x[1] for x in price_results]
+
+    # Normalize Currency
     portfolio[C['col_avg_price']] *= conv_factor
     portfolio[C['col_total_cost']] *= conv_factor
     portfolio[C['col_earnings']] *= conv_factor
@@ -67,6 +83,7 @@ if st.session_state['raw_df'] is not None:
     portfolio[C['col_pnl']] = portfolio[mkt_val_label] - portfolio[C['col_total_cost']]
     portfolio[C['col_yield']] = (portfolio[C['col_pnl']] / portfolio[C['col_total_cost']] * 100)
 
+    # Metrics
     t_cost, t_mkt = portfolio[C['col_total_cost']].sum(), portfolio[mkt_val_label].sum()
     t_earn = portfolio[C['col_earnings']].sum()
     perf = ((t_mkt / t_cost) - 1) * 100 if t_cost > 0 else 0
@@ -99,6 +116,7 @@ if st.session_state['raw_df'] is not None:
 
     with tab_data:
         st.markdown(f"### {texts['detailed_title']}")
+        st.caption(texts['status_legend'])  # THE TOOLTIP LEGEND
         st.dataframe(portfolio.style.format({
             C['col_avg_price']: f'{curr_symbol} ' + '{:.2f}',
             C['col_curr_price']: f'{curr_symbol} ' + '{:.2f}',
@@ -111,13 +129,13 @@ if st.session_state['raw_df'] is not None:
         }).background_gradient(subset=[C['col_yield']], cmap='RdYlGn'), use_container_width=True, hide_index=True)
 
     st.sidebar.divider()
-    if st.sidebar.button("🗑️ Reset Session"):
+    if st.sidebar.button("🗑️ " + texts['settings']):
         st.session_state['raw_df'] = None
         st.session_state['last_hash'] = None
         st.rerun()
 
 else:
-    # --- 6. PREMIUM CSS HERO PAGE (ZERO SCROLL) ---
+    # --- 6. PREMIUM CSS HERO PAGE ---
     st.markdown("""
         <style>
             .block-container { padding-top: 1.5rem; padding-bottom: 0rem; }
@@ -152,7 +170,6 @@ else:
         f"<p style='text-align: center; font-size: 1.1rem; opacity: 0.8; margin-top: 5px;'>{texts['welcome_msg']}</p>",
         unsafe_allow_html=True)
 
-    # These boxes now contain the clickable hyperlink
     col_msg1, col_msg2, col_msg3 = st.columns(3)
     with col_msg1:
         st.info(texts['step_1'])

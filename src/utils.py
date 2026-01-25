@@ -20,6 +20,7 @@ def get_data_hash(df):
 def get_exchange_rate():
     try:
         data = yf.download("USDBRL=X", period="1d", progress=False)
+        # Fix: Using .item() to avoid FutureWarning
         return data['Close'].iloc[-1].item()
     except:
         return 5.45
@@ -120,15 +121,24 @@ def calculate_earnings_monthly(df, conv_factor):
 
 @st.cache_data(ttl=3600)
 def fetch_market_prices(tickers, lang_code):
-    prices = {}
+    prices_info = {}
     msg = LANGUAGES[lang_code]['fetching_prices']
     p_bar = st.progress(0, text=msg)
+
     for i, t in enumerate(tickers):
         try:
             data = yf.download(f"{t}.SA", period="1d", progress=False, threads=False)
-            prices[t] = data['Close'].iloc[-1].item() if not data.empty else None
+            if not data.empty:
+                # Fix: Using .item() to avoid FutureWarning
+                prices_info[t] = {
+                    "price": data['Close'].iloc[-1].item(),
+                    "is_live": True
+                }
+            else:
+                prices_info[t] = {"price": None, "is_live": False}
         except:
-            prices[t] = None
+            prices_info[t] = {"price": None, "is_live": False}
         p_bar.progress((i + 1) / len(tickers))
+
     p_bar.empty()
-    return prices
+    return prices_info
