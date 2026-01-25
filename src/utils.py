@@ -27,7 +27,7 @@ def detect_asset_type(ticker):
     t = str(ticker).upper()
     if t.endswith('11'):
         return 'FII/ETF'
-    elif t.endswith('34') or any(t.endswith(s) for s in ['31', '32', '33', '35', '39']):
+    elif any(t.endswith(s) for s in ['34', '31', '33']):
         return 'BDR'
     elif any(t.endswith(s) for s in ['3', '4', '5', '6']):
         return 'Ação'
@@ -40,59 +40,68 @@ def load_and_process_files(uploaded_files):
     for file in uploaded_files:
         file.seek(0)
         df = pd.read_excel(file)
-        if 'Data do Negócio' not in df.columns:
-            for i, row in df.iterrows():
-                if 'Data do Negócio' in [str(v) for v in row.values]:
-                    df.columns = df.iloc[i];
-                    df = df.iloc[i + 1:].reset_index(drop=True);
-                    break
-
         if 'Data do Negócio' in df.columns:
             temp = pd.DataFrame()
             temp['date'] = pd.to_datetime(df['Data do Negócio'], dayfirst=True)
             temp['ticker'] = df['Código de Negociação'].apply(clean_ticker)
             temp['qty'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(0)
             temp['val'] = pd.to_numeric(df['Valor'], errors='coerce').fillna(0)
-            temp['type_op'] = df['Tipo de Movimentação'].apply(lambda x: 'BUY' if 'Compra' in str(x) else 'SELL')
-            all_data.append(temp.dropna(subset=['date']))
+            temp['type'] = df['Tipo de Movimentação'].apply(lambda x: 'BUY' if 'Compra' in str(x) else 'SELL')
+            temp['source'] = 'NEG'
+            all_data.append(temp)
+        else:
+            if 'Data' not in df.columns:
+                for i, row in df.iterrows():
+                    if 'Data' in [str(v) for v in row.values]:
+                        df.columns = df.iloc[i];
+                        df = df.iloc[i + 1:].reset_index(drop=True);
+                        break
+            if 'Movimentação' in df.columns:
+                temp = pd.DataFrame()
+                temp['date'] = pd.to_datetime(df['Data'], dayfirst=True)
+                temp['ticker'] = df['Produto'].apply(clean_ticker)
+                temp['val'] = pd.to_numeric(df['Valor da Operação'], errors='coerce').fillna(0)
+
+                def map_earn(m):
+                    # INCLUSÃO DE AMORTIZAÇÃO COMO EARNINGS
+                    terms = ['RENDIMENTO', 'DIVIDENDO', 'JCP', 'AMORTIZAÇÃO', 'AMORTIZACAO']
+                    return 'EARNINGS' if any(t in str(m).upper() for t in terms) else 'IGNORE'
+
+                temp['type'] = df['Movimentação'].apply(map_earn)
+                temp['source'] = 'MOV'
+                all_data.append(temp[temp['type'] == 'EARNINGS'])
     return pd.concat(all_data).sort_values(by='date') if all_data else pd.DataFrame()
 
 
 def calculate_portfolio(df):
     summary = []
-    groups = df.groupby('ticker')
-    for ticker, data in groups:
+    for ticker, data in df.groupby('ticker'):
         data = data.sort_values('date')
-        qty, cost = 0.0, 0.0
+        qty, cost, earnings = 0.0, 0.0, 0.0
         for _, row in data.iterrows():
-            if row['type_op'] == 'BUY':
+            if row['type'] == 'BUY':
                 qty += row['qty'];
                 cost += row['val']
-            elif row['type_op'] == 'SELL' and qty > 0:
+            elif row['type'] == 'SELL' and qty > 0:
                 avg_p = cost / qty;
                 qty -= row['qty'];
                 cost = qty * avg_p
-        if round(qty, 4) > 0:
-            summary.append({'ticker': ticker, 'qty': qty, 'avg_price': cost / qty, 'total_cost': cost,
-                            'asset_type': detect_asset_type(ticker)})
+            elif row['type'] == 'EARNINGS':
+                earnings += row['val']
+        if round(qty, 4) > 0 or earnings > 0:
+            summary.append({
+                'ticker': ticker, 'qty': qty, 'avg_price': cost / qty if qty > 0 else 0,
+                'total_cost': cost, 'earnings': earnings, 'asset_type': detect_asset_type(ticker)
+            })
     return pd.DataFrame(summary)
-
-
-def calculate_evolution(df, factor):
-    df_ev = df.copy()
-    df_ev['flow'] = df_ev.apply(lambda r: r['val'] if r['type_op'] == 'BUY' else -r['val'], axis=1)
-    ev = df_ev.groupby('date')['flow'].sum().cumsum().reset_index()
-    ev['flow'] *= factor
-    return ev
 
 
 @st.cache_data(ttl=3600)
 def fetch_market_prices(tickers):
     if not tickers: return {}
     prices = {}
-    symbols = [f"{t}.SA" for t in tickers]
     try:
-        data = yf.download(symbols, period="1d", progress=False, group_by='ticker')
+        data = yf.download([f"{t}.SA" for t in tickers], period="1d", progress=False, group_by='ticker')
         for t in tickers:
             try:
                 s = f"{t}.SA"
@@ -103,3 +112,21 @@ def fetch_market_prices(tickers):
     except:
         for t in tickers: prices[t] = {"p": None, "live": False}
     return prices
+
+
+def calculate_monthly_earnings(df, factor):
+    df_earn = df[df['type'] == 'EARNINGS'].copy()
+    if df_earn.empty: return pd.DataFrame()
+    df_earn['month_year'] = df_earn['date'].dt.strftime('%Y-%m')
+    res = df_earn.groupby('month_year')['val'].sum().reset_index()
+    res['val'] *= factor
+    return res.sort_values('month_year')
+
+
+def calculate_evolution(df, factor):
+    df_ev = df[df['source'] == 'NEG'].copy()
+    if df_ev.empty: return pd.DataFrame()
+    df_ev['flow'] = df_ev.apply(lambda r: r['val'] if r['type'] == 'BUY' else -r['val'], axis=1)
+    ev = df_ev.groupby('date')['flow'].sum().cumsum().reset_index()
+    ev['flow'] *= factor
+    return ev
