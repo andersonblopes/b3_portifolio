@@ -35,7 +35,6 @@ def plot_pie_earnings(df, names_col, values_col, is_usd, title):
 
 def plot_bar_earnings_horizontal(df, x_label, y_value, sym, is_usd, title):
     seps = ".," if is_usd else ", "
-    # Ranking Horizontal (Ordenado do maior para o menor)
     df_sorted = df.sort_values(y_value, ascending=True).tail(10)
     fig = px.bar(df_sorted, x=y_value, y=x_label, orientation='h', title=title, template="plotly_dark")
     fig.update_traces(marker_color='#00FFAA', hovertemplate="%{x:.2f}")

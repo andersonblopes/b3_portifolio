@@ -34,11 +34,9 @@ def detect_asset_type(ticker):
     return 'Outro'
 
 
-@st.cache_data
 def load_and_process_files(uploaded_files):
     all_data = []
     for file in uploaded_files:
-        file.seek(0)
         df = pd.read_excel(file)
         if 'Data do Negócio' in df.columns:
             temp = pd.DataFrame()
@@ -118,21 +116,3 @@ def fetch_market_prices(tickers):
     except:
         for t in tickers: prices[t] = {"p": None, "live": False}
     return prices
-
-
-def calculate_monthly_earnings(df, factor):
-    df_earn = df[df['type'] == 'EARNINGS'].copy()
-    if df_earn.empty: return pd.DataFrame()
-    df_earn['month_year'] = df_earn['date'].dt.strftime('%Y-%m')
-    res = df_earn.groupby('month_year')['val'].sum().reset_index()
-    res['val'] *= factor
-    return res.sort_values('month_year')
-
-
-def calculate_evolution(df, factor):
-    df_ev = df[df['source'] == 'NEG'].copy()
-    if df_ev.empty: return pd.DataFrame()
-    df_ev['flow'] = df_ev.apply(lambda r: r['val'] if r['type'] == 'BUY' else -r['val'], axis=1)
-    ev = df_ev.sort_values('date').groupby('date')['flow'].sum().cumsum().reset_index()
-    ev['flow'] *= factor
-    return ev
