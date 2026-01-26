@@ -7,15 +7,37 @@ from langs import LANGUAGES
 
 st.set_page_config(page_title="B3 Master", layout="wide", page_icon="📈")
 
+# Initialization of Session State
 if 'raw_df' not in st.session_state:
     st.session_state.raw_df = None
 
-# Sidebar
+# Sidebar Controls
 lang_choice = st.sidebar.selectbox("🌐 Idioma", ["Português (Brasil)", "English"])
 texts = LANGUAGES[lang_choice]
+
+st.sidebar.divider()
 currency_choice = st.sidebar.radio(texts['currency_label'], ["BRL (R$)", "USD ($)"])
+
+# Market Refresh Logic
+if st.sidebar.button("🔄 Refresh Market Prices"):
+    utils.fetch_market_prices.clear()  # Clears the cache for prices
+    utils.get_exchange_rate.clear()  # Clears the cache for USD rate
+    st.toast("Updating live market data...", icon="⏳")
+
 rate = utils.get_exchange_rate()
 st.sidebar.metric(label=texts['exchange_rate_msg'], value=f"R$ {rate:.2f}")
+
+st.sidebar.divider()
+uploaded_files = st.sidebar.file_uploader(texts['upload_msg'], type=['xlsx'], accept_multiple_files=True)
+
+if uploaded_files:
+    # Processing only occurs when new files are uploaded
+    st.session_state.raw_df = utils.load_and_process_files(uploaded_files)
+
+# Option to clear session data
+if st.sidebar.button("🗑️ Clear All Data"):
+    st.session_state.raw_df = None
+    st.rerun()
 
 is_usd = currency_choice == "USD ($)"
 sym, factor = ("$", 1 / rate) if is_usd else ("R$", 1.0)
@@ -24,22 +46,22 @@ sym, factor = ("$", 1 / rate) if is_usd else ("R$", 1.0)
 def fmt_reg(v): return f"{sym} {v:.2f}".replace('.', ',' if not is_usd else '.')
 
 
-uploaded_files = st.sidebar.file_uploader(texts['upload_msg'], type=['xlsx'], accept_multiple_files=True)
-if uploaded_files: st.session_state.raw_df = utils.load_and_process_files(uploaded_files)
-
+# Main UI Logic
 if st.session_state.raw_df is not None:
     raw_df = st.session_state.raw_df
     portfolio = utils.calculate_portfolio(raw_df)
     has_earnings = not raw_df[raw_df['type'] == 'EARNINGS'].empty
     portfolio_main = portfolio[portfolio['qty'] > 0].copy()
 
-    # Preços e Cálculos
+    # Fetch fresh prices using the cached function
     prices = utils.fetch_market_prices(portfolio_main['ticker'].unique().tolist())
+
     res = portfolio_main['ticker'].apply(
         lambda t: (prices.get(t, {}).get('p', 0) * factor, "✅" if prices.get(t, {}).get('live') else "⚠️"))
+
     portfolio_main['p_atual'] = [
-        x[0] if x[0] > 0 else portfolio_main.loc[portfolio_main['ticker'] == t, 'avg_price'].values[0] * factor for t, x
-        in zip(portfolio_main['ticker'], res)]
+        x[0] if x[0] > 0 else portfolio_main.loc[portfolio_main['ticker'] == t, 'avg_price'].values[0] * factor
+        for t, x in zip(portfolio_main['ticker'], res)]
     portfolio_main['status'] = [x[1] for x in res]
 
     for c in ['avg_price', 'total_cost', 'earnings']: portfolio_main[c] *= factor
@@ -64,7 +86,7 @@ if st.session_state.raw_df is not None:
         c1, c2 = st.columns(2)
         df_ev = raw_df[raw_df['source'] == 'NEG'].copy()
         if not df_ev.empty:
-            ev = df_ev.sort_values('date').groupby('date')['val'].sum().cumsum().reset_index();
+            ev = df_ev.sort_values('date').groupby('date')['val'].sum().cumsum().reset_index()
             ev['val'] *= factor
             c1.plotly_chart(
                 charts.plot_evolution(ev.rename(columns={'val': 'flow'}), sym, is_usd, texts['chart_evolution']),
@@ -73,49 +95,37 @@ if st.session_state.raw_df is not None:
             charts.plot_allocation(portfolio_main, 'asset_type', 'v_mercado', is_usd, texts['chart_allocation']),
             use_container_width=True)
 
-        st.divider();
+        st.divider()
         c3, c4 = st.columns(2)
-        df_inst = raw_df[raw_df['source'] == 'NEG'].groupby('inst')['val'].sum().reset_index();
+        df_inst = raw_df[raw_df['source'] == 'NEG'].groupby('inst')['val'].sum().reset_index()
         df_inst['val'] *= factor
         c3.plotly_chart(charts.plot_allocation(df_inst, 'inst', 'val', is_usd, texts['chart_asset_inst']),
                         use_container_width=True)
 
         if has_earnings:
-            earn_raw = raw_df[raw_df['type'] == 'EARNINGS'].copy();
+            earn_raw = raw_df[raw_df['type'] == 'EARNINGS'].copy()
             earn_raw['val'] *= factor
-            res_m = earn_raw.copy();
+            res_m = earn_raw.copy()
             res_m['month_year'] = res_m['date'].dt.strftime('%Y-%m')
             res_m = res_m.groupby('month_year')['val'].sum().reset_index().sort_values('month_year')
             c4.plotly_chart(charts.plot_earnings_evolution(res_m, sym, is_usd, texts['chart_earn_monthly']),
                             use_container_width=True)
 
-            st.divider();
-            c5, c6 = st.columns(2)
-            earn_inst = earn_raw.groupby('inst')['val'].sum().reset_index()
-            c5.plotly_chart(charts.plot_allocation(earn_inst, 'inst', 'val', is_usd, texts['chart_earn_inst']),
-                            use_container_width=True)
-            earn_ticker = earn_raw.groupby('ticker')['val'].sum().reset_index()
-            c6.plotly_chart(charts.plot_bar_earnings_horizontal(earn_ticker, 'ticker', 'val', sym, is_usd,
-                                                                texts['chart_earn_ticker']), use_container_width=True)
-
-    with tabs[1]:  # Laboratório de Dados
+    with tabs[1]:  # Data Lab
         st.write(texts['status_legend'])
         types = sorted(portfolio_main['asset_type'].unique())
         for t in types:
             sub_df = portfolio_main[portfolio_main['asset_type'] == t].copy()
             t_mkt = sub_df['v_mercado'].sum()
             weight = (t_mkt / mkt_total) * 100 if mkt_total > 0 else 0
-
-            # Título dinâmico e traduzido do expansor
             label_assets = texts['assets_count']
             title = f"📁 {t} | {len(sub_df)} {label_assets} | {fmt_reg(t_mkt)} ({weight:.2f}%)"
-
             with st.expander(title, expanded=True):
                 tables.render_portfolio_table(sub_df, texts, fmt_reg)
 
     if has_earnings:
-        with tabs[2]:  # Histórico de Proventos
-            earn_raw = raw_df[raw_df['type'] == 'EARNINGS'].copy();
+        with tabs[2]:  # Earnings
+            earn_raw = raw_df[raw_df['type'] == 'EARNINGS'].copy()
             earn_raw['val'] *= factor
             r1_c1, r1_c2 = st.columns(2)
             with r1_c1:
@@ -127,9 +137,14 @@ if st.session_state.raw_df is not None:
                 st.plotly_chart(
                     charts.plot_allocation(earn_raw.groupby('at_type')['val'].sum().reset_index(), 'at_type', 'val',
                                            is_usd, texts['chart_earn_asset_type']), use_container_width=True)
-
-            st.divider();
+            st.divider()
             st.subheader(texts['earnings_audit_title'])
             tables.render_earnings_log(earn_raw, texts, fmt_reg)
 else:
-    st.info(texts['welcome_sub'])
+    # Display the Welcome guide from image_5345f4.png
+    st.title("Bem-vindo ao B3 Master Portfolio")
+    st.subheader("Seu painel profissional de gestão de patrimônio.")
+    st.markdown("### 🚀 Guia de Início Rápido")
+    st.info("1. Acesse o [Portal do Investidor B3](https://www.investidor.b3.com.br/login)")
+    st.info("2. Baixe seus arquivos XLSX de **Negociação** e **Movimentação**.")
+    st.info("3. Arraste todos os arquivos para a barra lateral.")
