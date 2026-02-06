@@ -19,6 +19,11 @@ LANGUAGES = {
         'yahoo_unavailable_warning': 'Yahoo Finance unavailable for {missing}/{total} tickers. Using average cost as fallback.',
         'missing_prices_expander': 'Tickers without live price',
         'dedup_summary': 'Duplicates removed: {removed} rows (from {before} to {after})',
+        'pagination_page_size': 'Rows per page',
+        'pagination_prev': '◀ Prev',
+        'pagination_next': 'Next ▶',
+        'pagination_page': 'Page {page}/{pages}',
+        'pagination_showing': 'Showing {start}-{end} of {total}',
 
         # KPIs
         'total_invested': 'Invested capital',
@@ -96,6 +101,11 @@ LANGUAGES = {
         'yahoo_unavailable_warning': 'Yahoo Finance indisponível para {missing}/{total} tickers. Usando preço médio como fallback.',
         'missing_prices_expander': 'Tickers sem cotação ao vivo',
         'dedup_summary': 'Duplicatas removidas: {removed} linhas (de {before} para {after})',
+        'pagination_page_size': 'Linhas por página',
+        'pagination_prev': '◀ Anterior',
+        'pagination_next': 'Próxima ▶',
+        'pagination_page': 'Página {page}/{pages}',
+        'pagination_showing': 'Mostrando {start}-{end} de {total}',
 
         # KPIs
         'total_invested': 'Capital investido',

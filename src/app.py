@@ -316,30 +316,42 @@ if st.session_state.raw_df is not None:
                     return
 
                 df2 = df[columns].sort_values('date', ascending=False)
-                total = len(df2)
+                total = int(len(df2))
 
-                c1, c2, c3 = st.columns([1, 1, 2])
-                with c1:
-                    page_size = st.selectbox(
-                        "Page size",
-                        [10, 25, 50, 100, 200],
-                        index=1,
-                        key=f"{key_prefix}_page_size",
-                    )
-                with c2:
-                    max_page = max(1, (total + page_size - 1) // page_size)
-                    page = st.number_input(
-                        "Page",
-                        min_value=1,
-                        max_value=max_page,
-                        value=1,
-                        step=1,
-                        key=f"{key_prefix}_page",
-                    )
-                with c3:
+                page_size = st.selectbox(
+                    texts['pagination_page_size'],
+                    [10, 25, 50, 100, 200],
+                    index=1,
+                    key=f"{key_prefix}_page_size",
+                )
+
+                pages = max(1, (total + page_size - 1) // page_size)
+                page_key = f"{key_prefix}_page"
+                if page_key not in st.session_state:
+                    st.session_state[page_key] = 1
+
+                # Clamp in case the user changes page_size
+                st.session_state[page_key] = max(1, min(int(st.session_state[page_key]), pages))
+                page = int(st.session_state[page_key])
+
+                nav1, nav2, nav3 = st.columns([1, 1, 3])
+                with nav1:
+                    prev_disabled = page <= 1
+                    if st.button(texts['pagination_prev'], disabled=prev_disabled, key=f"{key_prefix}_prev"):
+                        st.session_state[page_key] = max(1, page - 1)
+                        st.rerun()
+
+                with nav2:
+                    next_disabled = page >= pages
+                    if st.button(texts['pagination_next'], disabled=next_disabled, key=f"{key_prefix}_next"):
+                        st.session_state[page_key] = min(pages, page + 1)
+                        st.rerun()
+
+                with nav3:
                     start = (page - 1) * page_size
                     end = min(start + page_size, total)
-                    st.caption(f"Showing {start + 1}-{end} of {total}")
+                    st.caption(texts['pagination_page'].format(page=page, pages=pages))
+                    st.caption(texts['pagination_showing'].format(start=start + 1, end=end, total=total))
 
                 st.dataframe(df2.iloc[start:end], width="stretch", hide_index=True)
 
