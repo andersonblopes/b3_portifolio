@@ -32,9 +32,23 @@ def get_exchange_rate():
 
 
 def clean_ticker(text):
-    if pd.isna(text): return "UNKNOWN"
-    match = re.search(r'([A-Z]{4}[34567811]{1,2})', str(text).upper())
-    return match.group(1) if match else str(text).split(' ')[0]
+    """Normalize B3 tickers.
+
+    Handles cases like fractional market tickers (e.g., KLBN4F -> KLBN4).
+    """
+    if pd.isna(text):
+        return "UNKNOWN"
+
+    raw = str(text).upper().strip()
+
+    # Capture common B3 patterns and allow an optional trailing 'F' (mercado fracionário)
+    match = re.search(r"([A-Z]{4}(?:11|[3-8]|3[134]|33|34))(F)?", raw)
+    if match:
+        ticker = match.group(1)
+        return ticker
+
+    # Fallback: take the first token before a space/dash
+    return raw.split(" ")[0].split("-")[0]
 
 
 def detect_asset_type(ticker):

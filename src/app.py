@@ -118,13 +118,17 @@ if st.session_state.raw_df is not None:
     prices = utils.fetch_market_prices(tickers)
 
     live_count = sum(1 for t in tickers if prices.get(t, {}).get('live'))
-    if tickers and live_count < len(tickers):
+    missing_tickers = [t for t in tickers if not prices.get(t, {}).get('live')]
+
+    if tickers and missing_tickers:
         st.sidebar.warning(
             texts['yahoo_unavailable_warning'].format(
-                missing=(len(tickers) - live_count),
+                missing=len(missing_tickers),
                 total=len(tickers),
             )
         )
+        with st.sidebar.expander("Tickers without live price", expanded=False):
+            st.write(", ".join(sorted(missing_tickers)))
 
     res = portfolio_main['ticker'].apply(
         lambda t: (prices.get(t, {}).get('p', 0) * factor, "✅" if prices.get(t, {}).get('live') else "⚠️"))
