@@ -1,63 +1,64 @@
 # 💰 B3 Portfolio Master (B3 Master)
 
-Dashboard financeiro em **Streamlit** para consolidar extratos da **B3 (Bolsa do Brasil)** e acompanhar evolução de patrimônio,
-proventos e alocação de ativos.
+A **Streamlit** financial dashboard to consolidate **B3 (Brazilian Stock Exchange)** statements and track portfolio
+performance, passive income and asset allocation.
 
-> **Privacidade:** os arquivos `.xlsx` são processados localmente.
-> **Internet:** o app pode consultar **Yahoo Finance (yfinance)** para cotação de ativos e câmbio **USD/BRL**.
+> **Privacy:** your `.xlsx` files are processed locally.
+> **Internet:** the app can optionally query **Yahoo Finance (yfinance)** for market prices and the **USD/BRL** exchange rate.
 
 ## 🚀 Features
 
-- **Multi-arquivo**: envie vários extratos `.xlsx` de uma vez.
-- **Moeda**: alternar entre **BRL (R$)** e **USD ($)**.
-- **Idiomas**: **Português (Brasil)** e **English**.
-- **Dados de mercado (opcional)**: integração com Yahoo Finance para preços.
-- **Visualizações**:
-  - Evolução de patrimônio (fluxo acumulado)
-  - Proventos por mês
-  - Alocação por tipo de ativo e por instituição
+- **Multi-file upload**: upload multiple B3 `.xlsx` statements at once.
+- **Bi-currency**: toggle between **BRL (R$)** and **USD ($)**.
+- **Internationalization**: **English** and **Português (Brasil)**.
+- **Market data (optional)**: Yahoo Finance integration for prices.
+- **Visual analytics**:
+  - Portfolio evolution (cumulative flow)
+  - Monthly passive income
+  - Allocation by asset type and by broker/institution
 
-## 🧾 Formato dos arquivos (input esperado)
+## 🧾 Expected input files
 
-O app detecta automaticamente o tipo de planilha pelos cabeçalhos:
+The app auto-detects the statement type based on column headers:
 
-- **Negociação**: precisa conter a coluna **`Data do Negócio`**
-- **Movimentação**: precisa conter as colunas **`Data`** e **`Movimentação`**
+- **Trading / Negotiation** statement: must contain **`Data do Negócio`**
+- **Movements** statement: must contain **`Data`** and **`Movimentação`**
 
-Se o layout do arquivo exportado mudar, pode ser necessário ajustar o parser em `src/utils.py`.
+If B3 changes the export layout, you may need to adjust the parser in `src/utils.py`.
 
-## 🛠️ Estrutura do projeto
+## 🛠️ Project structure
 
 ```text
 b3_importer/
 ├── src/
-│   ├── app.py          # UI (Streamlit)
-│   ├── utils.py        # Parsing + regras financeiras + mercado (yfinance)
-│   ├── tables.py       # Tabelas
-│   ├── charts.py       # Gráficos (Plotly)
-│   └── langs.py        # Textos/i18n
-├── setup.sh            # Setup e execução (macOS/Linux)
+│   ├── app.py          # Streamlit UI
+│   ├── utils.py        # Parsing + financial rules + market data (yfinance)
+│   ├── tables.py       # Tables
+│   ├── charts.py       # Charts (Plotly)
+│   └── langs.py        # i18n dictionaries
+├── setup.sh            # Setup & run script (macOS/Linux)
 ├── requirements.txt
 └── .gitignore
 ```
 
-## ⚙️ Instalação e execução
+## ⚙️ Installation & run
 
-### Pré-requisitos
+### Prerequisites
 
 - Python **3.9+**
 
-### Opção A — macOS/Linux (script)
+### Option A — macOS/Linux (script)
 
 ```bash
 chmod +x setup.sh
 ./setup.sh
 ```
 
-### Opção B — manual (macOS/Linux/Windows)
+### Option B — manual (macOS/Linux/Windows)
 
 ```bash
 python -m venv venv
+
 # macOS/Linux:
 ./venv/bin/pip install -U pip
 ./venv/bin/pip install -r requirements.txt
@@ -69,43 +70,43 @@ python -m venv venv
 # .\venv\Scripts\streamlit run src\app.py
 ```
 
-Depois abra: **http://127.0.0.1:8501**
+Then open: **http://127.0.0.1:8501**
 
-## ✅ Como testar (manual)
+## ✅ How to test (manual)
 
-1) Abra o app no browser
-2) Faça upload de 1+ arquivos `.xlsx` (Negociação e/ou Movimentação)
-3) Valide:
-- KPIs: total investido, valor de mercado, PnL, proventos
-- Aba **Visuals**: evolução e alocação
-- Aba **Data**: tabelas por tipo de ativo
-- Aba **Earnings** (se houver proventos)
-4) Clique **Refresh Market Prices** e verifique o status (✅/⚠️)
-5) Clique **Clear All Data** para limpar a sessão
+1) Open the app in your browser
+2) Upload one or more `.xlsx` files (Trading and/or Movements)
+3) Validate:
+- KPIs: invested amount, market value, PnL, earnings
+- **Visuals** tab: evolution and allocation
+- **Data** tab: tables by asset type
+- **Earnings** tab (if earnings are present)
+4) Click **Refresh Market Prices** and check the status indicators (✅/⚠️)
+5) Click **Clear All Data** to reset the session
 
 ## 🧯 Troubleshooting
 
-- **Nada aparece após o upload**: confira se a planilha possui as colunas esperadas (ver seção “Formato dos arquivos”).
-- **Cotações/câmbio não atualizam**: pode ser instabilidade/limite do Yahoo Finance. Tente novamente ou use o app sem refresh.
-- **Erros ao ler XLSX**: atualize dependências e garanta que o arquivo não está corrompido.
+- **Nothing shows up after upload**: verify the file contains the expected columns (see “Expected input files”).
+- **Prices / FX do not refresh**: Yahoo Finance may be rate-limited or temporarily unstable. Try again later.
+- **XLSX read errors**: upgrade dependencies and make sure the file is not corrupted.
 
-## 🛡️ Privacidade
+## 🛡️ Privacy
 
-- Não usa banco de dados.
-- Os dados ficam em memória de sessão do Streamlit.
-- Ao fechar a aba (ou usar **Clear All Data**), você elimina os dados carregados.
+- No database.
+- Data stays in Streamlit session memory.
+- Closing the tab (or clicking **Clear All Data**) removes the loaded data.
 
-## 🗺️ Roadmap (ideias)
+## 🗺️ Roadmap (ideas)
 
-- Modo offline (sem consultas ao Yahoo Finance)
-- Testes automatizados para parsing e regras de cálculo
-- Melhorias no parser para suportar mais variações de export da B3
-- Export consolidado (Excel) mais completo
+- Offline mode (no Yahoo Finance calls)
+- Automated tests for parsing and calculation rules
+- Improve parsers to support more B3 export variations
+- Better consolidated Excel export
 
 ## 📄 License
 
-Projeto para uso pessoal e acompanhamento de portfólio.
+Personal use / portfolio tracking.
 
 ---
 
-Criado por Anderson Lopes
+Created by Anderson Lopes
