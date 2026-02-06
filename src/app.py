@@ -322,12 +322,18 @@ if st.session_state.raw_df is not None:
                 st.markdown(
                     """
 <style>
-/* Compact pagination buttons (audit tables) */
+/* Compact pagination buttons (audit tables)
+   Note: selectors are broad in Streamlit; keep changes minimal. */
+div[data-testid="stHorizontalBlock"] .stButton { margin: 0; padding: 0; }
 div[data-testid="stHorizontalBlock"] .stButton button {
-  padding: 0.15rem 0.45rem;
-  min-height: 2rem;
-  font-size: 0.9rem;
+  padding: 0.10rem 0.35rem;
+  min-height: 1.75rem;
+  line-height: 1.1;
+  font-size: 0.85rem;
+  white-space: nowrap; /* avoid label wrapping */
 }
+/* Reduce extra vertical spacing around pagination rows */
+div[data-testid="stHorizontalBlock"] { row-gap: 0.15rem; column-gap: 0.15rem; }
 </style>
 """,
                     unsafe_allow_html=True,
