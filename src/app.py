@@ -94,6 +94,16 @@ with st.sidebar.expander(texts['sidebar_import'], expanded=False):
         st.caption(texts['import_summary_label'])
         st.dataframe(st.session_state.import_stats, width="stretch", hide_index=True)
 
+        # Optional dedup summary (if present)
+        if 'dedup_removed_main' in st.session_state.import_stats.columns:
+            dedup_row = st.session_state.import_stats[st.session_state.import_stats['detected'] == 'DEDUP']
+            if not dedup_row.empty:
+                removed = int((dedup_row['dedup_removed_main'].fillna(0).iloc[0] or 0) + (dedup_row['dedup_removed_audit'].fillna(0).iloc[0] or 0))
+                before = int(dedup_row['rows_total'].fillna(0).iloc[0] or 0)
+                after = int(before - (dedup_row['dedup_removed_main'].fillna(0).iloc[0] or 0))
+                if removed > 0:
+                    st.caption(texts['dedup_summary'].format(removed=removed, before=before, after=after))
+
     if st.button(texts['clear_data_button']):
         st.session_state.raw_df = None
         st.session_state.import_stats = None
@@ -135,7 +145,7 @@ if st.session_state.raw_df is not None:
                 total=len(tickers),
             )
         )
-        with st.sidebar.expander("Tickers without live price", expanded=False):
+        with st.sidebar.expander(texts['missing_prices_expander'], expanded=False):
             st.write(", ".join(sorted(missing_tickers)))
 
     res = portfolio_main['ticker'].apply(
@@ -213,12 +223,12 @@ if st.session_state.raw_df is not None:
             ev['cashflow'] *= factor
             c1.plotly_chart(
                 charts.plot_evolution(ev.rename(columns={'cashflow': 'flow'}), sym, is_usd, texts['chart_evolution']),
-                width="stretch",
+                use_container_width=True,
                 config=PLOTLY_CONFIG,
             )
         c2.plotly_chart(
             charts.plot_allocation(portfolio_main, 'asset_type', 'v_mercado', is_usd, texts['chart_allocation']),
-            width="stretch",
+            use_container_width=True,
             config=PLOTLY_CONFIG,
         )
 
@@ -228,7 +238,7 @@ if st.session_state.raw_df is not None:
         df_inst['val'] *= factor
         c3.plotly_chart(
             charts.plot_allocation(df_inst, 'inst', 'val', is_usd, texts['chart_asset_inst']),
-            width="stretch",
+            use_container_width=True,
             config=PLOTLY_CONFIG,
         )
 
@@ -240,7 +250,7 @@ if st.session_state.raw_df is not None:
             res_m = res_m.groupby('month_year')['val'].sum().reset_index().sort_values('month_year')
             c4.plotly_chart(
                 charts.plot_earnings_evolution(res_m, sym, is_usd, texts['chart_earn_monthly']),
-                width="stretch",
+                use_container_width=True,
                 config=PLOTLY_CONFIG,
             )
 
@@ -272,7 +282,7 @@ if st.session_state.raw_df is not None:
                         is_usd,
                         texts['chart_earn_type'],
                     ),
-                    width="stretch",
+                    use_container_width=True,
                     config=PLOTLY_CONFIG,
                 )
             with r1_c2:
@@ -285,7 +295,7 @@ if st.session_state.raw_df is not None:
                         is_usd,
                         texts['chart_earn_asset_type'],
                     ),
-                    width="stretch",
+                    use_container_width=True,
                     config=PLOTLY_CONFIG,
                 )
             st.divider()

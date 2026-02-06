@@ -17,6 +17,8 @@ LANGUAGES = {
         'import_summary_label': 'Import summary',
         'clear_data_button': '🗑️ Clear session data',
         'yahoo_unavailable_warning': 'Yahoo Finance unavailable for {missing}/{total} tickers. Using average cost as fallback.',
+        'missing_prices_expander': 'Tickers without live price',
+        'dedup_summary': 'Duplicates removed: {removed} rows (from {before} to {after})',
 
         # KPIs
         'total_invested': 'Invested capital',
@@ -92,6 +94,8 @@ LANGUAGES = {
         'import_summary_label': 'Resumo da importação',
         'clear_data_button': '🗑️ Limpar dados da sessão',
         'yahoo_unavailable_warning': 'Yahoo Finance indisponível para {missing}/{total} tickers. Usando preço médio como fallback.',
+        'missing_prices_expander': 'Tickers sem cotação ao vivo',
+        'dedup_summary': 'Duplicatas removidas: {removed} linhas (de {before} para {after})',
 
         # KPIs
         'total_invested': 'Capital investido',

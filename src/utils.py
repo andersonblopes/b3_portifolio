@@ -192,6 +192,49 @@ def load_and_process_files(uploaded_files):
     stats_df = pd.DataFrame(stats_rows).sort_values(['file', 'detected']) if stats_rows else None
     audit_df = pd.concat(audit_rows).sort_values(by='date', ascending=False) if audit_rows else pd.DataFrame()
 
+    # --- Deduplication across multiple uploads (common when importing overlapping periods) ---
+    def _dedup(df: pd.DataFrame) -> tuple[pd.DataFrame, int, int]:
+        if df is None or df.empty:
+            return df, 0, 0
+        before = int(len(df))
+
+        cols = [c for c in ['date', 'ticker', 'type', 'qty', 'val', 'inst', 'source', 'sub_type', 'desc'] if c in df.columns]
+        out = df.drop_duplicates(subset=cols, keep='first')
+        after = int(len(out))
+        return out, before, after
+
+    main_df, main_before, main_after = _dedup(main_df)
+    audit_df, audit_before, audit_after = _dedup(audit_df)
+
+    # Append a small summary row to the import stats (non-breaking for the UI).
+    if stats_df is None:
+        stats_df = pd.DataFrame()
+
+    if (main_before and main_after) or (audit_before and audit_after):
+        stats_df = pd.concat(
+            [
+                stats_df,
+                pd.DataFrame(
+                    [
+                        {
+                            'file': '(ALL)',
+                            'detected': 'DEDUP',
+                            'rows_total': main_before,
+                            'rows_buy': None,
+                            'rows_sell': None,
+                            'rows_earnings': None,
+                            'rows_fees': None,
+                            'rows_transfer': None,
+                            'rows_ignored': None,
+                            'dedup_removed_main': main_before - main_after,
+                            'dedup_removed_audit': audit_before - audit_after,
+                        }
+                    ]
+                ),
+            ],
+            ignore_index=True,
+        )
+
     return main_df, stats_df, audit_df
 
 
