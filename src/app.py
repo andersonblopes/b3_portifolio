@@ -23,12 +23,32 @@ currency_choice = st.sidebar.radio(texts['currency_label'], ["BRL (R$)", "USD ($
 # Market refresh (manual + optional auto)
 from streamlit_autorefresh import st_autorefresh
 
-auto_refresh = st.sidebar.toggle("⏱️ Auto-refresh market prices", value=False)
+# Keep the label short to avoid wrapping in the sidebar.
+auto_refresh = st.sidebar.toggle("⏱️ Auto refresh", value=False, help="Auto refresh market prices on a timer")
 
-# When enabled, rerun every minute.
 refresh_count = None
+refresh_interval_ms = None
+
 if auto_refresh:
-    refresh_count = st_autorefresh(interval=60 * 1000, key="auto_market_refresh")
+    refresh_interval_label = st.sidebar.selectbox(
+        "Refresh interval",
+        ["30s", "1m", "5m"],
+        index=1,
+        help="How often to refresh market prices and FX rate",
+    )
+    refresh_interval_ms = {"30s": 30_000, "1m": 60_000, "5m": 300_000}[refresh_interval_label]
+    refresh_count = st_autorefresh(interval=refresh_interval_ms, key="auto_market_refresh")
+
+# Sidebar CSS: prevent toggle labels from wrapping.
+st.sidebar.markdown(
+    """
+<style>
+/* Avoid wrapped toggle labels in the sidebar */
+section[data-testid="stSidebar"] .stToggle label p { white-space: nowrap; }
+</style>
+""",
+    unsafe_allow_html=True,
+)
 
 # Market Refresh Logic
 manual_refresh = st.sidebar.button("🔄 Refresh Market Prices")
