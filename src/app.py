@@ -213,12 +213,12 @@ if st.session_state.raw_df is not None:
             ev['cashflow'] *= factor
             c1.plotly_chart(
                 charts.plot_evolution(ev.rename(columns={'cashflow': 'flow'}), sym, is_usd, texts['chart_evolution']),
-                use_container_width=True,
+                width="stretch",
                 config=PLOTLY_CONFIG,
             )
         c2.plotly_chart(
             charts.plot_allocation(portfolio_main, 'asset_type', 'v_mercado', is_usd, texts['chart_allocation']),
-            use_container_width=True,
+            width="stretch",
             config=PLOTLY_CONFIG,
         )
 
@@ -228,7 +228,7 @@ if st.session_state.raw_df is not None:
         df_inst['val'] *= factor
         c3.plotly_chart(
             charts.plot_allocation(df_inst, 'inst', 'val', is_usd, texts['chart_asset_inst']),
-            use_container_width=True,
+            width="stretch",
             config=PLOTLY_CONFIG,
         )
 
@@ -240,7 +240,7 @@ if st.session_state.raw_df is not None:
             res_m = res_m.groupby('month_year')['val'].sum().reset_index().sort_values('month_year')
             c4.plotly_chart(
                 charts.plot_earnings_evolution(res_m, sym, is_usd, texts['chart_earn_monthly']),
-                use_container_width=True,
+                width="stretch",
                 config=PLOTLY_CONFIG,
             )
 
@@ -272,7 +272,7 @@ if st.session_state.raw_df is not None:
                         is_usd,
                         texts['chart_earn_type'],
                     ),
-                    use_container_width=True,
+                    width="stretch",
                     config=PLOTLY_CONFIG,
                 )
             with r1_c2:
@@ -285,7 +285,7 @@ if st.session_state.raw_df is not None:
                         is_usd,
                         texts['chart_earn_asset_type'],
                     ),
-                    use_container_width=True,
+                    width="stretch",
                     config=PLOTLY_CONFIG,
                 )
             st.divider()
@@ -308,7 +308,7 @@ if st.session_state.raw_df is not None:
                 else:
                     st.dataframe(
                         fees_df[['date', 'ticker', 'inst', 'val', 'desc']].sort_values('date', ascending=False),
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
 
@@ -319,7 +319,7 @@ if st.session_state.raw_df is not None:
                 else:
                     st.dataframe(
                         transfers_df[['date', 'ticker', 'inst', 'val', 'desc']].sort_values('date', ascending=False),
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
 
@@ -330,7 +330,7 @@ if st.session_state.raw_df is not None:
                 else:
                     st.dataframe(
                         ignored_df[['date', 'ticker', 'inst', 'val', 'desc', 'source']].sort_values('date', ascending=False),
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
 else:
