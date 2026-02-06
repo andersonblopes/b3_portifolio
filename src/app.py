@@ -51,7 +51,14 @@ is_usd = currency_choice == "USD ($)"
 sym, factor = ("$", 1 / rate) if is_usd else ("R$", 1.0)
 
 
-def fmt_reg(v): return f"{sym} {v:.2f}".replace('.', ',' if not is_usd else '.')
+def fmt_reg(v):
+    return f"{sym} {v:.2f}".replace('.', ',' if not is_usd else '.')
+
+
+PLOTLY_CONFIG = {
+    "displayModeBar": False,
+    "responsive": True,
+}
 
 
 # Main UI Logic
@@ -107,10 +114,12 @@ if st.session_state.raw_df is not None:
             c1.plotly_chart(
                 charts.plot_evolution(ev.rename(columns={'val': 'flow'}), sym, is_usd, texts['chart_evolution']),
                 width="stretch",
+                config=PLOTLY_CONFIG,
             )
         c2.plotly_chart(
             charts.plot_allocation(portfolio_main, 'asset_type', 'v_mercado', is_usd, texts['chart_allocation']),
             width="stretch",
+            config=PLOTLY_CONFIG,
         )
 
         st.divider()
@@ -120,6 +129,7 @@ if st.session_state.raw_df is not None:
         c3.plotly_chart(
             charts.plot_allocation(df_inst, 'inst', 'val', is_usd, texts['chart_asset_inst']),
             width="stretch",
+            config=PLOTLY_CONFIG,
         )
 
         if has_earnings:
@@ -131,6 +141,7 @@ if st.session_state.raw_df is not None:
             c4.plotly_chart(
                 charts.plot_earnings_evolution(res_m, sym, is_usd, texts['chart_earn_monthly']),
                 width="stretch",
+                config=PLOTLY_CONFIG,
             )
 
     with tabs[1]:  # Data Lab
@@ -160,6 +171,7 @@ if st.session_state.raw_df is not None:
                         texts['chart_earn_type'],
                     ),
                     width="stretch",
+                    config=PLOTLY_CONFIG,
                 )
             with r1_c2:
                 earn_raw['at_type'] = earn_raw['ticker'].apply(utils.detect_asset_type)
@@ -172,6 +184,7 @@ if st.session_state.raw_df is not None:
                         texts['chart_earn_asset_type'],
                     ),
                     width="stretch",
+                    config=PLOTLY_CONFIG,
                 )
             st.divider()
             st.subheader(texts['earnings_audit_title'])
