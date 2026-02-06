@@ -334,7 +334,9 @@ if st.session_state.raw_df is not None:
                 st.session_state[page_key] = max(1, min(int(st.session_state[page_key]), pages))
                 page = int(st.session_state[page_key])
 
-                def page_buttons_window(curr: int, total_pages: int) -> list[int | str]:
+                from typing import List, Union
+
+                def page_buttons_window(curr: int, total_pages: int) -> List[Union[int, str]]:
                     """Return a list like [1, '…', 4, 5, 6, '…', 20]."""
                     if total_pages <= 7:
                         return list(range(1, total_pages + 1))
@@ -352,7 +354,7 @@ if st.session_state.raw_df is not None:
 
                     pages_sorted = sorted(p for p in window if 1 <= p <= total_pages)
 
-                    out: list[int | str] = []
+                    out: List[Union[int, str]] = []
                     prev = None
                     for p in pages_sorted:
                         if prev is not None and p - prev > 1:
