@@ -305,44 +305,43 @@ if st.session_state.raw_df is not None:
     if show_audit:
         with tabs[audit_tab_idx]:
             audit_df = st.session_state.audit_df.copy()
-            c1, c2, c3 = st.columns(3)
 
             fees_df = audit_df[audit_df['type'] == 'FEES'].copy()
             transfers_df = audit_df[audit_df['type'] == 'TRANSFER'].copy()
             ignored_df = audit_df[audit_df['type'] == 'IGNORE'].copy()
 
-            with c1:
-                st.subheader(texts['audit_fees'])
-                if fees_df.empty:
-                    st.caption("(none)")
-                else:
-                    st.dataframe(
-                        fees_df[['date', 'ticker', 'inst', 'val', 'desc']].sort_values('date', ascending=False),
-                        width="stretch",
-                        hide_index=True,
-                    )
+            # Stack tables vertically to avoid horizontal scrolling.
+            st.subheader(texts['audit_fees'])
+            if fees_df.empty:
+                st.caption("(none)")
+            else:
+                st.dataframe(
+                    fees_df[['date', 'ticker', 'inst', 'val', 'desc']].sort_values('date', ascending=False),
+                    width="stretch",
+                    hide_index=True,
+                )
 
-            with c2:
-                st.subheader(texts['audit_transfers'])
-                if transfers_df.empty:
-                    st.caption("(none)")
-                else:
-                    st.dataframe(
-                        transfers_df[['date', 'ticker', 'inst', 'val', 'desc']].sort_values('date', ascending=False),
-                        width="stretch",
-                        hide_index=True,
-                    )
+            st.divider()
+            st.subheader(texts['audit_transfers'])
+            if transfers_df.empty:
+                st.caption("(none)")
+            else:
+                st.dataframe(
+                    transfers_df[['date', 'ticker', 'inst', 'val', 'desc']].sort_values('date', ascending=False),
+                    width="stretch",
+                    hide_index=True,
+                )
 
-            with c3:
-                st.subheader(texts['audit_ignored'])
-                if ignored_df.empty:
-                    st.caption("(none)")
-                else:
-                    st.dataframe(
-                        ignored_df[['date', 'ticker', 'inst', 'val', 'desc', 'source']].sort_values('date', ascending=False),
-                        width="stretch",
-                        hide_index=True,
-                    )
+            st.divider()
+            st.subheader(texts['audit_ignored'])
+            if ignored_df.empty:
+                st.caption("(none)")
+            else:
+                st.dataframe(
+                    ignored_df[['date', 'ticker', 'inst', 'val', 'desc', 'source']].sort_values('date', ascending=False),
+                    width="stretch",
+                    hide_index=True,
+                )
 else:
     st.title(texts['welcome_title'])
     st.subheader(texts['welcome_subheader'])
