@@ -37,7 +37,7 @@ if uploaded_files:
     st.session_state.raw_df, st.session_state.import_stats = utils.load_and_process_files(uploaded_files)
 
 # Import summary
-if st.session_state.import_stats:
+if st.session_state.import_stats is not None and not st.session_state.import_stats.empty:
     with st.sidebar.expander("📄 Import summary", expanded=False):
         st.dataframe(st.session_state.import_stats, width="stretch", hide_index=True)
 
