@@ -23,35 +23,56 @@ if 'audit_df' not in st.session_state:
 # (Some reruns / browser behaviors can wipe session_state; query params survive reloads.)
 qp = st.query_params
 
-if "lang_choice" not in st.session_state:
-    st.session_state.lang_choice = qp.get("lang", "Português (Brasil)")
+# Use stable language *codes* internally so labels can change without breaking state.
+LANG_CODE_TO_KEY = {
+    "pt": "Português (Brasil)",
+    "en": "English",
+    "es": "Español",
+    "fr": "Français",
+}
+LANG_KEY_TO_CODE = {v: k for k, v in LANG_CODE_TO_KEY.items()}
+
+if "lang_code" not in st.session_state:
+    # Accept either code (pt/en/es/fr) or a legacy full language key in the URL
+    raw = qp.get("lang", "pt")
+    if raw in LANG_CODE_TO_KEY:
+        st.session_state.lang_code = raw
+    else:
+        st.session_state.lang_code = LANG_KEY_TO_CODE.get(raw, "pt")
 
 if "currency_code" not in st.session_state:
     st.session_state.currency_code = qp.get("cur", "BRL")
 
 
 def _sync_lang_to_url():
-    st.query_params["lang"] = st.session_state.lang_choice
+    st.query_params["lang"] = st.session_state.lang_code
 
 
 def _sync_currency_to_url():
     st.query_params["cur"] = st.session_state.currency_code
 
 
-language_options = [
-    "Português (Brasil)",
-    "English",
-    "Español",
-    "Français",
-]
+language_codes = ["pt", "en", "es", "fr"]
 
-lang_choice = st.sidebar.selectbox(
+
+def fmt_lang(code: str) -> str:
+    # Display-friendly labels (no need to say "(Brasil)" in the UI)
+    return {
+        "pt": "Português",
+        "en": "English",
+        "es": "Español",
+        "fr": "Français",
+    }.get(code, str(code))
+
+
+lang_code = st.sidebar.selectbox(
     "🌐 Language / Idioma",
-    language_options,
-    key="lang_choice",
+    language_codes,
+    key="lang_code",
+    format_func=fmt_lang,
     on_change=_sync_lang_to_url,
 )
-texts = LANGUAGES[lang_choice]
+texts = LANGUAGES[LANG_CODE_TO_KEY[lang_code]]
 
 # Sidebar CSS: compact spacing to avoid vertical scrolling.
 st.sidebar.markdown(
