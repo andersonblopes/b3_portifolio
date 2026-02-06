@@ -24,7 +24,7 @@ if 'audit_df' not in st.session_state:
 qp = st.query_params
 
 if "lang_choice" not in st.session_state:
-    st.session_state.lang_choice = qp.get("lang", "Português")
+    st.session_state.lang_choice = qp.get("lang", "Português (Brasil)")
 
 if "currency_code" not in st.session_state:
     st.session_state.currency_code = qp.get("cur", "BRL")
@@ -39,7 +39,7 @@ def _sync_currency_to_url():
 
 
 language_options = [
-    "Português",
+    "Português (Brasil)",
     "English",
     "Español",
     "Français",

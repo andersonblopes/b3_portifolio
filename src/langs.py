@@ -99,7 +99,7 @@ LANGUAGES = {
         'chart_earn_inst': 'Earnings by broker',
     },
 
-    'Português': {
+    'Português (Brasil)': {
         # --- Sidebar ---
         'currency_label': 'Moeda de exibição',
         'upload_msg': 'Importar extratos B3 (Negociação / Movimentação)',
