@@ -11,7 +11,7 @@ LANGUAGES = {
         # --- Sidebar ---
         'currency_label': 'Display currency',
         'upload_msg': 'Import B3 statements (Trading / Movements)',
-        'exchange_rate_msg': 'USD/BRL FX rate',
+        'fx_rate_msg': '{base}/BRL FX rate',
         'refresh_button': '🔄 Refresh market data',
         'refresh_toast': 'Updating market data...',
         'auto_refresh_label': '⏱️ Auto refresh',
@@ -101,7 +101,7 @@ LANGUAGES = {
         # --- Sidebar ---
         'currency_label': 'Moeda de exibição',
         'upload_msg': 'Importar extratos B3 (Negociação / Movimentação)',
-        'exchange_rate_msg': 'Câmbio USD/BRL',
+        'fx_rate_msg': 'Câmbio {base}/BRL',
         'refresh_button': '🔄 Atualizar mercado',
         'refresh_toast': 'Atualizando dados de mercado...',
         'auto_refresh_label': '⏱️ Auto',

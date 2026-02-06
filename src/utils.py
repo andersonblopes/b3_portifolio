@@ -18,17 +18,30 @@ warnings.filterwarnings(
 
 
 @st.cache_data(ttl=3600)
-def get_exchange_rate():
-    """Fetch USD/BRL FX rate.
+def get_exchange_rate(base_currency: str = "USD"):
+    """Fetch FX rate for base_currency/BRL.
+
+    Examples:
+      - USD/BRL: base_currency="USD" -> ticker "USDBRL=X"
+      - EUR/BRL: base_currency="EUR" -> ticker "EURBRL=X"
 
     Falls back to a fixed value if Yahoo Finance is unavailable.
     """
+    base = str(base_currency).upper().strip()
+
+    # Simple fallbacks (used only when Yahoo is unavailable)
+    fallback = {"USD": 5.45, "EUR": 5.90}.get(base, 5.45)
+
     try:
-        data = yf.download("USDBRL=X", period="1d", progress=False)
-        return float(data["Close"].iloc[-1])
+        data = yf.download(f"{base}BRL=X", period="1d", progress=False)
+        close = data["Close"].dropna()
+        return float(close.iloc[-1])
     except Exception:
-        logger.exception("Failed to fetch USD/BRL exchange rate from Yahoo Finance. Using fallback rate.")
-        return 5.45
+        logger.exception(
+            "Failed to fetch %s/BRL exchange rate from Yahoo Finance. Using fallback rate.",
+            base,
+        )
+        return float(fallback)
 
 
 def clean_ticker(text):

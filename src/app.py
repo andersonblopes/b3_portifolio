@@ -34,7 +34,7 @@ section[data-testid="stSidebar"] .stToggle label p { white-space: nowrap; }
 )
 
 with st.sidebar.expander(texts['sidebar_settings'], expanded=False):
-    currency_choice = st.radio(texts['currency_label'], ["BRL (R$)", "USD ($)"])
+    currency_choice = st.radio(texts['currency_label'], ["BRL (R$)", "USD ($)", "EUR (€)"])
 
 with st.sidebar.expander(texts['sidebar_market'], expanded=False):
     # Market refresh (manual + optional auto)
@@ -76,8 +76,16 @@ with st.sidebar.expander(texts['sidebar_market'], expanded=False):
             st.session_state.last_auto_refresh_count = refresh_count
         st.toast(texts['refresh_toast'], icon="⏳")
 
-    rate = utils.get_exchange_rate()
-    st.metric(label=texts['exchange_rate_msg'], value=f"R$ {rate:.2f}")
+    # FX rate shown depends on selected display currency
+    if currency_choice.startswith("USD"):
+        fx_base = "USD"
+    elif currency_choice.startswith("EUR"):
+        fx_base = "EUR"
+    else:
+        fx_base = "USD"
+
+    rate = utils.get_exchange_rate(fx_base)
+    st.metric(label=texts['fx_rate_msg'].format(base=fx_base), value=f"R$ {rate:.2f}")
 
 with st.sidebar.expander(texts['sidebar_import'], expanded=False):
     uploaded_files = st.file_uploader(texts['upload_msg'], type=['xlsx'], accept_multiple_files=True)
@@ -111,11 +119,19 @@ with st.sidebar.expander(texts['sidebar_import'], expanded=False):
         st.rerun()
 
 is_usd = currency_choice == "USD ($)"
-sym, factor = ("$", 1 / rate) if is_usd else ("R$", 1.0)
+is_eur = currency_choice == "EUR (€)"
+
+if is_usd:
+    sym, factor = ("$", 1 / rate)
+elif is_eur:
+    sym, factor = ("€", 1 / rate)
+else:
+    sym, factor = ("R$", 1.0)
 
 
 def fmt_reg(v):
-    return f"{sym} {v:.2f}".replace('.', ',' if not is_usd else '.')
+    decimal = ',' if (not is_usd and not is_eur) else '.'
+    return f"{sym} {v:.2f}".replace('.', decimal)
 
 
 PLOTLY_CONFIG = {
