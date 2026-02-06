@@ -318,21 +318,39 @@ if st.session_state.raw_df is not None:
                 df2 = df[columns].sort_values('date', ascending=False)
                 total = int(len(df2))
 
-                page_size = st.selectbox(
-                    texts['pagination_page_size'],
-                    [10, 25, 50, 100, 200],
-                    index=1,
-                    key=f"{key_prefix}_page_size",
+                # Lightweight CSS to make pagination look closer to classic web UIs
+                st.markdown(
+                    """
+<style>
+/* Compact pagination buttons (audit tables) */
+div[data-testid="stHorizontalBlock"] .stButton button {
+  padding: 0.15rem 0.45rem;
+  min-height: 2rem;
+  font-size: 0.9rem;
+}
+</style>
+""",
+                    unsafe_allow_html=True,
                 )
 
-                pages = max(1, (total + page_size - 1) // page_size)
+                # State
+                page_size_key = f"{key_prefix}_page_size"
                 page_key = f"{key_prefix}_page"
+
+                if page_size_key not in st.session_state:
+                    st.session_state[page_size_key] = 50
                 if page_key not in st.session_state:
                     st.session_state[page_key] = 1
 
-                # Clamp in case the user changes page_size
+                page_size = int(st.session_state[page_size_key])
+                pages = max(1, (total + page_size - 1) // page_size)
                 st.session_state[page_key] = max(1, min(int(st.session_state[page_key]), pages))
                 page = int(st.session_state[page_key])
+
+                # Slice + table (table first; controls go under it)
+                start = (page - 1) * page_size
+                end = min(start + page_size, total)
+                st.dataframe(df2.iloc[start:end], width="stretch", hide_index=True)
 
                 from typing import List, Union
 
@@ -346,7 +364,6 @@ if st.session_state.raw_df is not None:
                         if 1 <= p <= total_pages:
                             window.add(p)
 
-                    # Also show page 2 and penultimate to reduce ellipsis jitter near edges
                     if curr <= 3:
                         window.update({2, 3, 4})
                     if curr >= total_pages - 2:
@@ -363,9 +380,12 @@ if st.session_state.raw_df is not None:
                         prev = p
                     return out
 
-                # Controls row (prev + numbers + next)
+                st.caption(texts['pagination_showing'].format(start=start + 1, end=end, total=total))
+
                 items = page_buttons_window(page, pages)
-                cols = st.columns([1] + [1] * len(items) + [1])
+
+                # Controls row under the table: Prev | pages | Next | page size
+                cols = st.columns([1] + [1] * len(items) + [1, 2])
 
                 # Prev
                 prev_disabled = page <= 1
@@ -387,15 +407,18 @@ if st.session_state.raw_df is not None:
 
                 # Next
                 next_disabled = page >= pages
-                if cols[-1].button(texts['pagination_next'], disabled=next_disabled, key=f"{key_prefix}_next"):
+                if cols[-2].button(texts['pagination_next'], disabled=next_disabled, key=f"{key_prefix}_next"):
                     st.session_state[page_key] = min(pages, page + 1)
                     st.rerun()
 
-                start = (page - 1) * page_size
-                end = min(start + page_size, total)
-                st.caption(texts['pagination_showing'].format(start=start + 1, end=end, total=total))
-
-                st.dataframe(df2.iloc[start:end], width="stretch", hide_index=True)
+                # Page size selector (right-aligned-ish)
+                cols[-1].selectbox(
+                    texts['pagination_page_size'],
+                    [25, 50, 100, 200, 500],
+                    index=[25, 50, 100, 200, 500].index(page_size) if page_size in [25, 50, 100, 200, 500] else 1,
+                    key=page_size_key,
+                    label_visibility="collapsed",
+                )
 
             # Stack tables vertically (with pagination) to avoid horizontal scrolling.
             st.subheader(texts['audit_fees'])
