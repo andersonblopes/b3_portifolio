@@ -63,10 +63,17 @@ def detect_asset_type(ticker):
 
 
 def load_and_process_files(uploaded_files):
-    """Load B3 exported XLSX statements and return (normalized_df, import_stats_df)."""
+    """Load B3 exported XLSX statements.
+
+    Returns:
+        main_df: normalized rows used by the current dashboards (NEG BUY/SELL + MOV EARNINGS)
+        stats_df: per-file parsing summary
+        audit_df: extra rows for auditing (MOV FEES/TRANSFER/IGNORE + NEG IGNORE)
+    """
 
     all_data = []
     stats_rows = []
+    audit_rows = []
 
     for file in uploaded_files:
         file_name = getattr(file, "name", "uploaded.xlsx")
@@ -88,6 +95,7 @@ def load_and_process_files(uploaded_files):
             temp.loc[movement.str.contains('VENDA', na=False), 'type'] = 'SELL'
 
             temp['source'] = 'NEG'
+            temp['desc'] = df['Tipo de Movimentação'].astype(str)
 
             stats_rows.append(
                 {
@@ -103,6 +111,7 @@ def load_and_process_files(uploaded_files):
                 }
             )
 
+            audit_rows.append(temp[temp['type'] == 'IGNORE'])
             all_data.append(temp[temp['type'] != 'IGNORE'])
             continue
 
@@ -128,6 +137,7 @@ def load_and_process_files(uploaded_files):
                 sign = es.map(lambda x: -1 if 'DEB' in x else 1).fillna(1)
 
             temp['val'] = pd.to_numeric(df['Valor da Operação'], errors='coerce').fillna(0) * sign
+            temp['desc'] = df['Movimentação'].astype(str)
 
             def map_mov(m):
                 m_upper = str(m).upper()
@@ -176,9 +186,13 @@ def load_and_process_files(uploaded_files):
             # Keep only earnings in the main dataset for now (so existing views remain consistent).
             all_data.append(temp[temp['type'] == 'EARNINGS'])
 
-    out_df = pd.concat(all_data).sort_values(by='date', ascending=False) if all_data else pd.DataFrame()
+            audit_rows.append(temp[temp['type'] != 'EARNINGS'])
+
+    main_df = pd.concat(all_data).sort_values(by='date', ascending=False) if all_data else pd.DataFrame()
     stats_df = pd.DataFrame(stats_rows).sort_values(['file', 'detected']) if stats_rows else None
-    return out_df, stats_df
+    audit_df = pd.concat(audit_rows).sort_values(by='date', ascending=False) if audit_rows else pd.DataFrame()
+
+    return main_df, stats_df, audit_df
 
 
 def calculate_portfolio(df):

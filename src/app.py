@@ -1,3 +1,4 @@
+import pandas as pd
 import streamlit as st
 
 import charts
@@ -12,6 +13,8 @@ if 'raw_df' not in st.session_state:
     st.session_state.raw_df = None
 if 'import_stats' not in st.session_state:
     st.session_state.import_stats = None
+if 'audit_df' not in st.session_state:
+    st.session_state.audit_df = None
 
 # Sidebar Controls
 # Note: this label is intentionally bilingual because we need the selection before we can load `texts`.
@@ -81,7 +84,11 @@ with st.sidebar.expander(texts['sidebar_import'], expanded=False):
 
     if uploaded_files:
         # Processing only occurs when new files are uploaded
-        st.session_state.raw_df, st.session_state.import_stats = utils.load_and_process_files(uploaded_files)
+        (
+            st.session_state.raw_df,
+            st.session_state.import_stats,
+            st.session_state.audit_df,
+        ) = utils.load_and_process_files(uploaded_files)
 
     if st.session_state.import_stats is not None and not st.session_state.import_stats.empty:
         st.caption(texts['import_summary_label'])
@@ -90,6 +97,7 @@ with st.sidebar.expander(texts['sidebar_import'], expanded=False):
     if st.button(texts['clear_data_button']):
         st.session_state.raw_df = None
         st.session_state.import_stats = None
+        st.session_state.audit_df = None
         st.rerun()
 
 is_usd = currency_choice == "USD ($)"
@@ -146,24 +154,65 @@ if st.session_state.raw_df is not None:
 
     # KPIs
     inv_total, earn_total = portfolio_main['total_cost'].sum(), portfolio_main['earnings'].sum()
-    k1, k2, k3, k4 = st.columns(4)
+
+    fees_total = 0.0
+    if st.session_state.audit_df is not None and not st.session_state.audit_df.empty:
+        fees_total = float(st.session_state.audit_df[st.session_state.audit_df['type'] == 'FEES']['val'].sum())
+
+    net_earnings = earn_total + fees_total
+
+    k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric(texts['total_invested'], fmt_reg(inv_total))
     k2.metric(texts['market_value'], fmt_reg(mkt_total), f"{(mkt_total / inv_total - 1) * 100:.2f}%")
     k3.metric(texts['gross_pnl'], fmt_reg(mkt_total - inv_total))
-    if has_earnings: k4.metric(texts['total_earnings'], fmt_reg(earn_total))
+    if has_earnings:
+        k4.metric(texts['total_earnings'], fmt_reg(earn_total))
+        k5.metric(texts['kpi_earnings_net'], fmt_reg(net_earnings))
 
-    tabs = st.tabs(
-        [f"📊 {texts['tab_visuals']}", f"📝 {texts['tab_data']}", f"💰 {texts['tab_earnings']}"] if has_earnings else [
-            f"📊 {texts['tab_visuals']}", f"📝 {texts['tab_data']}"])
+    show_audit = st.session_state.audit_df is not None and not st.session_state.audit_df.empty
+
+    tab_labels = [f"📊 {texts['tab_visuals']}", f"📝 {texts['tab_data']}"]
+    if has_earnings:
+        tab_labels.append(f"💰 {texts['tab_earnings']}")
+    if show_audit:
+        tab_labels.append(f"🧾 {texts['tab_audit']}")
+
+    tabs = st.tabs(tab_labels)
+
+    earnings_tab_idx = 2 if has_earnings else None
+    audit_tab_idx = (3 if has_earnings else 2) if show_audit else None
 
     with tabs[0]:  # Dashboard Global
         c1, c2 = st.columns(2)
-        df_ev = raw_df[raw_df['source'] == 'NEG'].copy()
-        if not df_ev.empty:
-            ev = df_ev.sort_values('date').groupby('date')['val'].sum().cumsum().reset_index()
-            ev['val'] *= factor
+        # Cashflow evolution (BUY = outflow, SELL/EARNINGS = inflow, FEES = outflow)
+        cf = raw_df[['date', 'type', 'val']].copy()
+        if not cf.empty:
+            cf['cashflow'] = 0.0
+            cf.loc[cf['type'] == 'BUY', 'cashflow'] = -cf.loc[cf['type'] == 'BUY', 'val']
+            cf.loc[cf['type'].isin(['SELL', 'EARNINGS']), 'cashflow'] = cf.loc[
+                cf['type'].isin(['SELL', 'EARNINGS']), 'val'
+            ]
+
+            cf2 = cf[['date', 'cashflow']]
+
+            if st.session_state.audit_df is not None and not st.session_state.audit_df.empty:
+                fees_df = st.session_state.audit_df[st.session_state.audit_df['type'] == 'FEES'][
+                    ['date', 'val']
+                ].copy()
+                fees_df = fees_df.rename(columns={'val': 'cashflow'})
+                cf2 = pd.concat([cf2, fees_df], ignore_index=True)
+
+            ev = (
+                cf2.dropna(subset=['date'])
+                .sort_values('date')
+                .groupby('date')['cashflow']
+                .sum()
+                .cumsum()
+                .reset_index()
+            )
+            ev['cashflow'] *= factor
             c1.plotly_chart(
-                charts.plot_evolution(ev.rename(columns={'val': 'flow'}), sym, is_usd, texts['chart_evolution']),
+                charts.plot_evolution(ev.rename(columns={'cashflow': 'flow'}), sym, is_usd, texts['chart_evolution']),
                 use_container_width=True,
                 config=PLOTLY_CONFIG,
             )
@@ -210,7 +259,7 @@ if st.session_state.raw_df is not None:
                 tables.render_portfolio_table(sub_df, texts, fmt_reg)
 
     if has_earnings:
-        with tabs[2]:  # Earnings
+        with tabs[earnings_tab_idx]:  # Earnings
             earn_raw = raw_df[raw_df['type'] == 'EARNINGS'].copy()
             earn_raw['val'] *= factor
             r1_c1, r1_c2 = st.columns(2)
@@ -242,6 +291,48 @@ if st.session_state.raw_df is not None:
             st.divider()
             st.subheader(texts['earnings_audit_title'])
             tables.render_earnings_log(earn_raw, texts, fmt_reg)
+
+    if show_audit:
+        with tabs[audit_tab_idx]:
+            audit_df = st.session_state.audit_df.copy()
+            c1, c2, c3 = st.columns(3)
+
+            fees_df = audit_df[audit_df['type'] == 'FEES'].copy()
+            transfers_df = audit_df[audit_df['type'] == 'TRANSFER'].copy()
+            ignored_df = audit_df[audit_df['type'] == 'IGNORE'].copy()
+
+            with c1:
+                st.subheader(texts['audit_fees'])
+                if fees_df.empty:
+                    st.caption("(none)")
+                else:
+                    st.dataframe(
+                        fees_df[['date', 'ticker', 'inst', 'val', 'desc']].sort_values('date', ascending=False),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+            with c2:
+                st.subheader(texts['audit_transfers'])
+                if transfers_df.empty:
+                    st.caption("(none)")
+                else:
+                    st.dataframe(
+                        transfers_df[['date', 'ticker', 'inst', 'val', 'desc']].sort_values('date', ascending=False),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+            with c3:
+                st.subheader(texts['audit_ignored'])
+                if ignored_df.empty:
+                    st.caption("(none)")
+                else:
+                    st.dataframe(
+                        ignored_df[['date', 'ticker', 'inst', 'val', 'desc', 'source']].sort_values('date', ascending=False),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
 else:
     st.title(texts['welcome_title'])
     st.subheader(texts['welcome_subheader'])

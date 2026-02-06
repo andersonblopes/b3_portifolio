@@ -28,7 +28,12 @@ LANGUAGES = {
         'tab_visuals': 'Dashboard',
         'tab_data': 'Data Lab',
         'tab_earnings': 'Earnings history',
+        'tab_audit': 'Audit',
         'earnings_audit_title': 'Earnings ledger',
+        'audit_fees': 'Fees / taxes',
+        'audit_transfers': 'Transfers / settlements',
+        'audit_ignored': 'Ignored rows',
+        'kpi_earnings_net': 'Net earnings',
 
         # Charts
         'chart_evolution': 'Net cash flow (cumulative)',
@@ -98,7 +103,12 @@ LANGUAGES = {
         'tab_visuals': 'Painel visual',
         'tab_data': 'Laboratório de dados',
         'tab_earnings': 'Histórico de proventos',
+        'tab_audit': 'Auditoria',
         'earnings_audit_title': 'Razão de proventos',
+        'audit_fees': 'Taxas / impostos',
+        'audit_transfers': 'Transferências / liquidações',
+        'audit_ignored': 'Linhas ignoradas',
+        'kpi_earnings_net': 'Proventos líquidos',
 
         # Charts
         'chart_evolution': 'Fluxo de caixa líquido (acumulado)',
