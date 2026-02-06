@@ -1,73 +1,111 @@
-# 💰 B3 Portfolio Master
+# 💰 B3 Portfolio Master (B3 Master)
 
-A sophisticated, multi-language financial dashboard built with Streamlit to consolidate B3 (Brazilian Stock Exchange)
-statements. This tool provides deep insights into patrimony evolution, passive income flow, and asset allocation.
+Dashboard financeiro em **Streamlit** para consolidar extratos da **B3 (Bolsa do Brasil)** e acompanhar evolução de patrimônio,
+proventos e alocação de ativos.
+
+> **Privacidade:** os arquivos `.xlsx` são processados localmente.
+> **Internet:** o app pode consultar **Yahoo Finance (yfinance)** para cotação de ativos e câmbio **USD/BRL**.
 
 ## 🚀 Features
 
-- **Multi-File Processing**: Upload multiple B3 Excel statements simultaneously.
-- **Bi-Currency Support**: Toggle between **BRL (R$)** and **USD ($)** with real-time exchange rate updates.
-- **Internationalization**: Full support for **English** and **Português (Brasil)**.
-- **Live Market Data**: Integrated with Yahoo Finance for real-time stock and REIT prices.
-- **Visual Analytics**:
-    - **Patrimony Evolution**: Track your invested capital journey.
-    - **Passive Income Flow**: Monthly bar charts with trend averages.
-    - **Sunburst Allocation**: Hierarchical view of categories and specific assets.
-- **Security First**: 100% local processing. Your financial data never leaves your machine.
+- **Multi-arquivo**: envie vários extratos `.xlsx` de uma vez.
+- **Moeda**: alternar entre **BRL (R$)** e **USD ($)**.
+- **Idiomas**: **Português (Brasil)** e **English**.
+- **Dados de mercado (opcional)**: integração com Yahoo Finance para preços.
+- **Visualizações**:
+  - Evolução de patrimônio (fluxo acumulado)
+  - Proventos por mês
+  - Alocação por tipo de ativo e por instituição
 
-## 🛠️ Project Structure
+## 🧾 Formato dos arquivos (input esperado)
 
-The project follows a clean, modular architecture:
+O app detecta automaticamente o tipo de planilha pelos cabeçalhos:
+
+- **Negociação**: precisa conter a coluna **`Data do Negócio`**
+- **Movimentação**: precisa conter as colunas **`Data`** e **`Movimentação`**
+
+Se o layout do arquivo exportado mudar, pode ser necessário ajustar o parser em `src/utils.py`.
+
+## 🛠️ Estrutura do projeto
 
 ```text
 b3_importer/
 ├── src/
-│   ├── charts.py       # Visualization components
-│   ├── tables.py       # Data tables and summaries
-│   ├── app.py          # Dashboard UI and layout
-│   ├── utils.py        # Financial logic and API integrations
-│   └── langs.py        # Internationalization dictionaries
-├── setup.sh            # Automated setup and launch script
-├── .gitignore          # Security and environment filters
-└── requirements.txt    # Project dependencies
+│   ├── app.py          # UI (Streamlit)
+│   ├── utils.py        # Parsing + regras financeiras + mercado (yfinance)
+│   ├── tables.py       # Tabelas
+│   ├── charts.py       # Gráficos (Plotly)
+│   └── langs.py        # Textos/i18n
+├── setup.sh            # Setup e execução (macOS/Linux)
+├── requirements.txt
+└── .gitignore
 ```
 
-## ⚙️ Installation & Setup
+## ⚙️ Instalação e execução
 
-### Prerequisites
+### Pré-requisitos
 
-    - Python 3.9 or higher
-    - macOS/Linux (for the .sh script)
+- Python **3.9+**
 
-### Quick Start
-
-1. Clone the project to your local machine.
-2. Open your terminal in the project root.
-3. Run the setup script:
+### Opção A — macOS/Linux (script)
 
 ```bash
-    chmod +x setup.sh
-    ./setup.sh
+chmod +x setup.sh
+./setup.sh
 ```
 
-The script will automatically create a virtual environment, install dependencies (including watchdog for performance),
-and launch the dashboard in your browser.
+### Opção B — manual (macOS/Linux/Windows)
 
-## 📈 Usage
+```bash
+python -m venv venv
+# macOS/Linux:
+./venv/bin/pip install -U pip
+./venv/bin/pip install -r requirements.txt
+./venv/bin/streamlit run src/app.py
 
-1. Upload: Export your statements from the B3 Investor Portal as .xlsx and upload them in the sidebar.
-2. Analyze: Use the sidebar to switch languages or currencies.
-3. Export: Click the download button to get a consolidated Excel report of your processed data.
+# Windows (PowerShell):
+# .\venv\Scripts\pip install -U pip
+# .\venv\Scripts\pip install -r requirements.txt
+# .\venv\Scripts\streamlit run src\app.py
+```
 
-## 🛡️ Privacy
+Depois abra: **http://127.0.0.1:8501**
 
-This application is designed with privacy in mind. It does not use a database or cloud storage. All data is stored in
-temporary session memory and is wiped when the browser tab is closed or the "Reset Session" button is clicked.
+## ✅ Como testar (manual)
+
+1) Abra o app no browser
+2) Faça upload de 1+ arquivos `.xlsx` (Negociação e/ou Movimentação)
+3) Valide:
+- KPIs: total investido, valor de mercado, PnL, proventos
+- Aba **Visuals**: evolução e alocação
+- Aba **Data**: tabelas por tipo de ativo
+- Aba **Earnings** (se houver proventos)
+4) Clique **Refresh Market Prices** e verifique o status (✅/⚠️)
+5) Clique **Clear All Data** para limpar a sessão
+
+## 🧯 Troubleshooting
+
+- **Nada aparece após o upload**: confira se a planilha possui as colunas esperadas (ver seção “Formato dos arquivos”).
+- **Cotações/câmbio não atualizam**: pode ser instabilidade/limite do Yahoo Finance. Tente novamente ou use o app sem refresh.
+- **Erros ao ler XLSX**: atualize dependências e garanta que o arquivo não está corrompido.
+
+## 🛡️ Privacidade
+
+- Não usa banco de dados.
+- Os dados ficam em memória de sessão do Streamlit.
+- Ao fechar a aba (ou usar **Clear All Data**), você elimina os dados carregados.
+
+## 🗺️ Roadmap (ideias)
+
+- Modo offline (sem consultas ao Yahoo Finance)
+- Testes automatizados para parsing e regras de cálculo
+- Melhorias no parser para suportar mais variações de export da B3
+- Export consolidado (Excel) mais completo
 
 ## 📄 License
 
-This project is for personal use and portfolio tracking.
+Projeto para uso pessoal e acompanhamento de portfólio.
 
-#
+---
 
-Created by Anderson Lopes
+Criado por Anderson Lopes
