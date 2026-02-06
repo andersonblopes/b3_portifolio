@@ -78,7 +78,7 @@ LANGUAGES = {
         'refresh_button': '🔄 Atualizar mercado',
         'refresh_toast': 'Atualizando dados de mercado...',
         'auto_refresh_label': '⏱️ Auto',
-        'auto_refresh_help': 'Atualiza cotações e câmbio em um intervalo de tempo',
+        'auto_refresh_help': 'Atualiza cotações e câmbio automaticamente',
         'refresh_interval_label': 'Intervalo',
         'refresh_interval_help': 'Frequência de atualização de cotação e câmbio',
         'sidebar_settings': '⚙️ Ajustes',
