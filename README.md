@@ -38,6 +38,8 @@ b3_importer/
 │   └── langs.py        # i18n dictionaries
 ├── setup.sh            # Setup & run script (macOS/Linux)
 ├── requirements.txt
+├── requirements-dev.txt
+├── tests/            # Unit tests (pytest)
 └── .gitignore
 ```
 
@@ -72,7 +74,9 @@ python -m venv venv
 
 Then open: **http://127.0.0.1:8501**
 
-## ✅ How to test (manual)
+## ✅ Testing
+
+### Manual test
 
 1) Open the app in your browser
 2) Upload one or more `.xlsx` files (Trading and/or Movements)
@@ -83,6 +87,26 @@ Then open: **http://127.0.0.1:8501**
 - **Earnings** tab (if earnings are present)
 4) Click **Refresh Market Prices** and check the status indicators (✅/⚠️)
 5) Click **Clear All Data** to reset the session
+
+### Unit tests
+
+The project includes **pytest** unit tests for the parsing/business rules and helpers.
+
+Run:
+
+```bash
+# install dev dependencies
+./venv/bin/pip install -r requirements-dev.txt
+
+# run unit tests
+./venv/bin/python -m pytest
+```
+
+### Coverage
+
+```bash
+./venv/bin/python -m pytest --cov=src --cov-report=term-missing
+```
 
 ## 🧯 Troubleshooting
 
