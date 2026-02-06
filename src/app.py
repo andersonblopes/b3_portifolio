@@ -34,22 +34,23 @@ section[data-testid="stSidebar"] .stToggle label p { white-space: nowrap; }
 )
 
 with st.sidebar.expander(texts['sidebar_settings'], expanded=False):
-    currency_options = ["BRL (R$)", "USD ($)", "EUR (€)"]
+    # Store currency as a stable code in session_state so language changes never reset it.
+    currency_codes = ["BRL", "USD", "EUR"]
 
-    # Preserve currency selection across reruns (e.g., when changing language)
-    if "currency_choice" in st.session_state:
-        currency_choice = st.radio(
-            texts['currency_label'],
-            currency_options,
-            key="currency_choice",
-        )
-    else:
-        currency_choice = st.radio(
-            texts['currency_label'],
-            currency_options,
-            index=0,
-            key="currency_choice",
-        )
+    def fmt_currency(code: str) -> str:
+        return {
+            "BRL": "BRL (R$)",
+            "USD": "USD ($)",
+            "EUR": "EUR (€)",
+        }.get(code, str(code))
+
+    currency_code = st.radio(
+        texts['currency_label'],
+        currency_codes,
+        index=0,
+        key="currency_code",
+        format_func=fmt_currency,
+    )
 
 with st.sidebar.expander(texts['sidebar_market'], expanded=False):
     # Market refresh (manual + optional auto)
@@ -92,9 +93,7 @@ with st.sidebar.expander(texts['sidebar_market'], expanded=False):
         st.toast(texts['refresh_toast'], icon="⏳")
 
     # FX rate shown depends on selected display currency
-    if currency_choice.startswith("USD"):
-        fx_base = "USD"
-    elif currency_choice.startswith("EUR"):
+    if currency_code == "EUR":
         fx_base = "EUR"
     else:
         fx_base = "USD"
@@ -133,8 +132,8 @@ with st.sidebar.expander(texts['sidebar_import'], expanded=False):
         st.session_state.audit_df = None
         st.rerun()
 
-is_usd = currency_choice == "USD ($)"
-is_eur = currency_choice == "EUR (€)"
+is_usd = currency_code == "USD"
+is_eur = currency_code == "EUR"
 
 if is_usd:
     sym, factor = ("$", 1 / rate)
