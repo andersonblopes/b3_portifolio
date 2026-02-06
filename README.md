@@ -4,14 +4,14 @@ A **Streamlit** financial dashboard to consolidate **B3 (Brazilian Stock Exchang
 performance, passive income and asset allocation.
 
 > **Privacy:** your `.xlsx` files are processed locally.
-> **Internet:** the app can optionally query **Yahoo Finance (yfinance)** for market prices and the **USD/BRL** exchange rate.
+> **Internet:** the app can optionally query **Yahoo Finance (yfinance)** for market prices and FX rates (e.g., **USD/BRL**, **EUR/BRL**).
 
 ## 🚀 Features
 
 - **Multi-file upload**: upload multiple B3 `.xlsx` statements at once.
-- **Bi-currency**: toggle between **BRL (R$)** and **USD ($)**.
-- **Internationalization**: **English** and **Português (Brasil)**.
-- **Market data (optional)**: Yahoo Finance integration for prices.
+- **Multi-currency**: toggle between **BRL (R$)**, **USD ($)** and **EUR (€)**.
+- **Internationalization**: **English**, **Português**, **Español** and **Français**.
+- **Market data (optional)**: Yahoo Finance integration for prices + FX rates.
 - **Visual analytics**:
   - Portfolio evolution (cumulative flow)
   - Monthly passive income
@@ -88,6 +88,7 @@ Then open: **http://127.0.0.1:8501**
 
 - **Nothing shows up after upload**: verify the file contains the expected columns (see “Expected input files”).
 - **Prices / FX do not refresh**: Yahoo Finance may be rate-limited or temporarily unstable. Try again later.
+- **Language or currency resets after reload**: the app persists these settings in the URL (query params like `?lang=pt&cur=EUR`).
 - **XLSX read errors**: upgrade dependencies and make sure the file is not corrupted.
 
 ## 🛡️ Privacy
