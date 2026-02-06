@@ -18,7 +18,14 @@ if 'audit_df' not in st.session_state:
 
 # Sidebar Controls
 # Note: this label is intentionally bilingual because we need the selection before we can load `texts`.
-lang_choice = st.sidebar.selectbox("🌐 Language / Idioma", ["Português (Brasil)", "English"])
+if "lang_choice" not in st.session_state:
+    st.session_state.lang_choice = "Português (Brasil)"
+
+lang_choice = st.sidebar.selectbox(
+    "🌐 Language / Idioma",
+    ["Português (Brasil)", "English"],
+    key="lang_choice",
+)
 texts = LANGUAGES[lang_choice]
 
 # Sidebar CSS: compact spacing to avoid vertical scrolling.
