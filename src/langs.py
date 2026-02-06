@@ -6,6 +6,8 @@
 # - Keys currently used by the app come first.
 # - Unused/legacy keys (kept for future use) are grouped at the bottom.
 
+# NOTE: When adding a new language, keep the exact same keys and ordering.
+
 LANGUAGES = {
     'English': {
         # --- Sidebar ---
@@ -185,5 +187,185 @@ LANGUAGES = {
         'col_type': 'Tipo de ativo',
         'chart_earn_ticker': 'Maiores pagadores (ativos)',
         'chart_earn_inst': 'Proventos por corretora',
+    },
+
+    'Español': {
+        # --- Sidebar ---
+        'currency_label': 'Moneda de visualización',
+        'upload_msg': 'Importar extractos B3 (Negociación / Movimientos)',
+        'fx_rate_msg': 'Tipo de cambio {base}/BRL',
+        'refresh_button': '🔄 Actualizar mercado',
+        'refresh_toast': 'Actualizando datos de mercado...',
+        'auto_refresh_label': '⏱️ Auto',
+        'auto_refresh_help': 'Actualiza cotizaciones y tipo de cambio automáticamente',
+        'refresh_interval_label': 'Intervalo',
+        'refresh_interval_help': 'Frecuencia de actualización de cotizaciones y tipo de cambio',
+        'sidebar_settings': '⚙️ Ajustes',
+        'sidebar_market': '📈 Mercado',
+        'sidebar_import': '📄 Importación',
+        'import_summary_label': 'Resumen de importación',
+        'clear_data_button': '🗑️ Limpiar datos de la sesión',
+        'yahoo_unavailable_warning': (
+            'Yahoo Finance no disponible para {missing}/{total} tickers. Usando costo promedio como alternativa.'
+        ),
+        'missing_prices_expander': 'Tickers sin cotización en vivo',
+        'dedup_summary': 'Duplicados eliminados: {removed} filas (de {before} a {after})',
+
+        # --- Pagination ---
+        'pagination_page_size': 'Filas por página',
+        'pagination_prev': '◀ Anterior',
+        'pagination_next': 'Siguiente ▶',
+        'pagination_showing': 'Mostrando {start}-{end} de {total}',
+
+        # --- KPIs ---
+        'total_invested': 'Capital invertido',
+        'market_value': 'Valor de mercado',
+        'gross_pnl': 'Ganancia/Pérdida (no realizada)',
+        'total_earnings': 'Dividendos / proventos (caja)',
+        'kpi_earnings_net': 'Proventos netos',
+
+        # --- Tabs ---
+        'tab_visuals': 'Panel',
+        'tab_data': 'Laboratorio de datos',
+        'tab_earnings': 'Historial de proventos',
+        'tab_audit': 'Auditoría',
+
+        # --- Audit ---
+        'audit_fees': 'Comisiones / impuestos',
+        'audit_transfers': 'Transferencias / liquidaciones',
+        'audit_ignored': 'Filas ignoradas',
+
+        # --- Charts ---
+        'chart_evolution': 'Flujo de caja neto (acumulado)',
+        'chart_allocation': 'Asignación por tipo de activo',
+        'chart_earn_monthly': 'Proventos por mes',
+        'chart_earn_type': 'Proventos por tipo',
+        'chart_earn_asset_type': 'Proventos por tipo de activo',
+        'chart_asset_inst': 'Asignación por corredor',
+
+        # --- Tables / columns ---
+        'col_ticker': 'Activo',
+        'col_earning_type': 'Tipo de provento',
+        'col_qty': 'Cant.',
+        'col_avg_price': 'Costo promedio',
+        'col_total_cost': 'Costo total',
+        'col_curr_price': 'Cotización',
+        'col_yield': 'Rend.',
+        'col_pnl': 'Resultado',
+        'col_earnings': 'Proventos',
+        'col_status': 'Estado',
+        'col_date': 'Fecha',
+        'col_inst': 'Broker',
+
+        # --- Copy ---
+        'status_legend': '💡 ✅ Cotización en vivo | ⚠️ Alternativa: costo promedio',
+        'assets_count': 'activos',
+        'earnings_audit_title': 'Libro mayor de proventos',
+
+        # --- Welcome ---
+        'welcome_title': 'Bienvenido a B3 Master Portfolio',
+        'welcome_subheader': 'Un dashboard local para acompañar tu cartera y flujo de caja.',
+        'quick_start_title': '🚀 Guía rápida',
+        'quick_start_step1': '1. Descarga tus extractos XLSX en el Portal del Inversor B3.',
+        'quick_start_step2': '2. Sube archivos de Negociación y Movimientos en la barra lateral.',
+        'quick_start_step3': '3. Explora Panel, Laboratorio de datos e Historial de proventos.',
+
+        # --- Legacy / currently unused (kept to avoid churn) ---
+        'lang_label': 'Idioma',
+        'pagination_page': 'Página {page}/{pages}',
+        'weight_label': 'peso',
+        'col_type': 'Tipo de activo',
+        'chart_earn_ticker': 'Mayores pagadores (activos)',
+        'chart_earn_inst': 'Proventos por broker',
+    },
+
+    'Français': {
+        # --- Sidebar ---
+        'currency_label': 'Devise d\'affichage',
+        'upload_msg': 'Importer des relevés B3 (Transactions / Mouvements)',
+        'fx_rate_msg': 'Taux de change {base}/BRL',
+        'refresh_button': '🔄 Actualiser le marché',
+        'refresh_toast': 'Mise à jour des données de marché...',
+        'auto_refresh_label': '⏱️ Auto',
+        'auto_refresh_help': 'Met à jour automatiquement les cours et le taux de change',
+        'refresh_interval_label': 'Intervalle',
+        'refresh_interval_help': 'Fréquence de mise à jour des cours et du taux de change',
+        'sidebar_settings': '⚙️ Paramètres',
+        'sidebar_market': '📈 Marché',
+        'sidebar_import': '📄 Import',
+        'import_summary_label': 'Résumé d\'importation',
+        'clear_data_button': '🗑️ Effacer les données de session',
+        'yahoo_unavailable_warning': (
+            'Yahoo Finance indisponible pour {missing}/{total} tickers. Utilisation du coût moyen comme solution.'
+        ),
+        'missing_prices_expander': 'Tickers sans prix en direct',
+        'dedup_summary': 'Doublons supprimés : {removed} lignes (de {before} à {after})',
+
+        # --- Pagination ---
+        'pagination_page_size': 'Lignes par page',
+        'pagination_prev': '◀ Précédent',
+        'pagination_next': 'Suivant ▶',
+        'pagination_showing': 'Affichage {start}-{end} sur {total}',
+
+        # --- KPIs ---
+        'total_invested': 'Capital investi',
+        'market_value': 'Valeur de marché',
+        'gross_pnl': 'P/L (non réalisé)',
+        'total_earnings': 'Dividendes / revenus (cash)',
+        'kpi_earnings_net': 'Revenus nets',
+
+        # --- Tabs ---
+        'tab_visuals': 'Tableau de bord',
+        'tab_data': 'Laboratoire de données',
+        'tab_earnings': 'Historique des revenus',
+        'tab_audit': 'Audit',
+
+        # --- Audit ---
+        'audit_fees': 'Frais / impôts',
+        'audit_transfers': 'Transferts / règlements',
+        'audit_ignored': 'Lignes ignorées',
+
+        # --- Charts ---
+        'chart_evolution': 'Flux de trésorerie net (cumulé)',
+        'chart_allocation': 'Répartition par type d\'actif',
+        'chart_earn_monthly': 'Revenus par mois',
+        'chart_earn_type': 'Revenus par type',
+        'chart_earn_asset_type': 'Revenus par type d\'actif',
+        'chart_asset_inst': 'Répartition par courtier',
+
+        # --- Tables / columns ---
+        'col_ticker': 'Actif',
+        'col_earning_type': 'Type de revenu',
+        'col_qty': 'Qté',
+        'col_avg_price': 'Coût moyen',
+        'col_total_cost': 'Coût total',
+        'col_curr_price': 'Cours',
+        'col_yield': 'Rend.',
+        'col_pnl': 'Résultat',
+        'col_earnings': 'Revenus',
+        'col_status': 'Statut',
+        'col_date': 'Date',
+        'col_inst': 'Courtier',
+
+        # --- Copy ---
+        'status_legend': '💡 ✅ Prix en direct | ⚠️ Solution : coût moyen',
+        'assets_count': 'actifs',
+        'earnings_audit_title': 'Grand livre des revenus',
+
+        # --- Welcome ---
+        'welcome_title': 'Bienvenue sur B3 Master Portfolio',
+        'welcome_subheader': 'Un dashboard local pour suivre votre portefeuille et votre trésorerie.',
+        'quick_start_title': '🚀 Démarrage rapide',
+        'quick_start_step1': '1. Téléchargez vos relevés XLSX sur le portail investisseur B3.',
+        'quick_start_step2': '2. Importez les fichiers Transactions et Mouvements dans la barre latérale.',
+        'quick_start_step3': '3. Explorez le tableau de bord, les données et l\'historique des revenus.',
+
+        # --- Legacy / currently unused (kept to avoid churn) ---
+        'lang_label': 'Langue',
+        'pagination_page': 'Page {page}/{pages}',
+        'weight_label': 'poids',
+        'col_type': 'Type d\'actif',
+        'chart_earn_ticker': 'Principaux payeurs (actifs)',
+        'chart_earn_inst': 'Revenus par courtier',
     },
 }

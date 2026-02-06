@@ -38,9 +38,16 @@ def _sync_currency_to_url():
     st.query_params["cur"] = st.session_state.currency_code
 
 
+language_options = [
+    "Português (Brasil)",
+    "English",
+    "Español",
+    "Français",
+]
+
 lang_choice = st.sidebar.selectbox(
     "🌐 Language / Idioma",
-    ["Português (Brasil)", "English"],
+    language_options,
     key="lang_choice",
     on_change=_sync_lang_to_url,
 )
