@@ -18,80 +18,79 @@ if 'import_stats' not in st.session_state:
 lang_choice = st.sidebar.selectbox("🌐 Language / Idioma", ["Português (Brasil)", "English"])
 texts = LANGUAGES[lang_choice]
 
-st.sidebar.divider()
-currency_choice = st.sidebar.radio(texts['currency_label'], ["BRL (R$)", "USD ($)"])
-
-# Market refresh (manual + optional auto)
-from streamlit_autorefresh import st_autorefresh
-
-# Keep the label short to avoid wrapping in the sidebar.
-auto_refresh = st.sidebar.toggle(texts['auto_refresh_label'], value=False, help=texts['auto_refresh_help'])
-
-refresh_count = None
-refresh_interval_ms = None
-
-if auto_refresh:
-    refresh_interval_label = st.sidebar.selectbox(
-        texts['refresh_interval_label'],
-        ["30s", "1m", "5m"],
-        index=1,
-        help=texts['refresh_interval_help'],
-    )
-    refresh_interval_ms = {"30s": 30_000, "1m": 60_000, "5m": 300_000}[refresh_interval_label]
-    refresh_count = st_autorefresh(interval=refresh_interval_ms, key="auto_market_refresh")
-
-# Sidebar CSS: prevent toggle labels from wrapping.
+# Sidebar CSS: compact spacing to avoid vertical scrolling.
 st.sidebar.markdown(
     """
 <style>
-/* Avoid wrapped toggle labels in the sidebar */
+section[data-testid="stSidebar"] .stVerticalBlock { gap: 0.35rem; }
+section[data-testid="stSidebar"] .stMarkdown p { margin: 0.1rem 0; }
 section[data-testid="stSidebar"] .stToggle label p { white-space: nowrap; }
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-# Market Refresh Logic
-manual_refresh = st.sidebar.button(texts['refresh_button'])
+with st.sidebar.expander(texts['sidebar_settings'], expanded=True):
+    currency_choice = st.radio(texts['currency_label'], ["BRL (R$)", "USD ($)"])
 
-# Clear caches when the user clicks the button OR when the autorefresh ticks.
-# st_autorefresh returns an incrementing counter; use it to detect actual ticks.
-if 'last_auto_refresh_count' not in st.session_state:
-    st.session_state.last_auto_refresh_count = None
+with st.sidebar.expander(texts['sidebar_market'], expanded=False):
+    # Market refresh (manual + optional auto)
+    from streamlit_autorefresh import st_autorefresh
 
-auto_tick = (
-    auto_refresh
-    and refresh_count is not None
-    and refresh_count != st.session_state.last_auto_refresh_count
-)
+    # Keep the label short to avoid wrapping in the sidebar.
+    auto_refresh = st.toggle(texts['auto_refresh_label'], value=False, help=texts['auto_refresh_help'])
 
-if manual_refresh or auto_tick:
-    utils.fetch_market_prices.clear()  # Clears the cache for prices
-    utils.get_exchange_rate.clear()  # Clears the cache for USD rate
-    if auto_tick:
-        st.session_state.last_auto_refresh_count = refresh_count
-    st.toast(texts['refresh_toast'], icon="⏳")
+    refresh_count = None
+    refresh_interval_ms = None
 
-rate = utils.get_exchange_rate()
-st.sidebar.metric(label=texts['exchange_rate_msg'], value=f"R$ {rate:.2f}")
+    if auto_refresh:
+        refresh_interval_label = st.selectbox(
+            texts['refresh_interval_label'],
+            ["30s", "1m", "5m"],
+            index=1,
+            help=texts['refresh_interval_help'],
+        )
+        refresh_interval_ms = {"30s": 30_000, "1m": 60_000, "5m": 300_000}[refresh_interval_label]
+        refresh_count = st_autorefresh(interval=refresh_interval_ms, key="auto_market_refresh")
 
-st.sidebar.divider()
-uploaded_files = st.sidebar.file_uploader(texts['upload_msg'], type=['xlsx'], accept_multiple_files=True)
+    manual_refresh = st.button(texts['refresh_button'])
 
-if uploaded_files:
-    # Processing only occurs when new files are uploaded
-    st.session_state.raw_df, st.session_state.import_stats = utils.load_and_process_files(uploaded_files)
+    # Clear caches when the user clicks the button OR when the autorefresh ticks.
+    # st_autorefresh returns an incrementing counter; use it to detect actual ticks.
+    if 'last_auto_refresh_count' not in st.session_state:
+        st.session_state.last_auto_refresh_count = None
 
-# Import summary
-if st.session_state.import_stats is not None and not st.session_state.import_stats.empty:
-    with st.sidebar.expander(texts['import_summary_label'], expanded=False):
+    auto_tick = (
+        auto_refresh
+        and refresh_count is not None
+        and refresh_count != st.session_state.last_auto_refresh_count
+    )
+
+    if manual_refresh or auto_tick:
+        utils.fetch_market_prices.clear()  # Clears the cache for prices
+        utils.get_exchange_rate.clear()  # Clears the cache for USD rate
+        if auto_tick:
+            st.session_state.last_auto_refresh_count = refresh_count
+        st.toast(texts['refresh_toast'], icon="⏳")
+
+    rate = utils.get_exchange_rate()
+    st.metric(label=texts['exchange_rate_msg'], value=f"R$ {rate:.2f}")
+
+with st.sidebar.expander(texts['sidebar_import'], expanded=True):
+    uploaded_files = st.file_uploader(texts['upload_msg'], type=['xlsx'], accept_multiple_files=True)
+
+    if uploaded_files:
+        # Processing only occurs when new files are uploaded
+        st.session_state.raw_df, st.session_state.import_stats = utils.load_and_process_files(uploaded_files)
+
+    if st.session_state.import_stats is not None and not st.session_state.import_stats.empty:
+        st.caption(texts['import_summary_label'])
         st.dataframe(st.session_state.import_stats, width="stretch", hide_index=True)
 
-# Option to clear session data
-if st.sidebar.button(texts['clear_data_button']):
-    st.session_state.raw_df = None
-    st.session_state.import_stats = None
-    st.rerun()
+    if st.button(texts['clear_data_button']):
+        st.session_state.raw_df = None
+        st.session_state.import_stats = None
+        st.rerun()
 
 is_usd = currency_choice == "USD ($)"
 sym, factor = ("$", 1 / rate) if is_usd else ("R$", 1.0)

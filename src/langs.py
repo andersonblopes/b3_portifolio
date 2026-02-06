@@ -11,7 +11,10 @@ LANGUAGES = {
         'auto_refresh_help': 'Refresh market prices and FX rate on a timer',
         'refresh_interval_label': 'Refresh interval',
         'refresh_interval_help': 'How often to refresh prices and FX rate',
-        'import_summary_label': '📄 Import summary',
+        'sidebar_settings': '⚙️ Settings',
+        'sidebar_market': '📈 Market data',
+        'sidebar_import': '📄 Import',
+        'import_summary_label': 'Import summary',
         'clear_data_button': '🗑️ Clear session data',
         'yahoo_unavailable_warning': 'Yahoo Finance unavailable for {missing}/{total} tickers. Using average cost as fallback.',
 
@@ -78,7 +81,10 @@ LANGUAGES = {
         'auto_refresh_help': 'Atualiza cotações e câmbio em um intervalo de tempo',
         'refresh_interval_label': 'Intervalo',
         'refresh_interval_help': 'Frequência de atualização de cotação e câmbio',
-        'import_summary_label': '📄 Resumo da importação',
+        'sidebar_settings': '⚙️ Ajustes',
+        'sidebar_market': '📈 Mercado',
+        'sidebar_import': '📄 Importação',
+        'import_summary_label': 'Resumo da importação',
         'clear_data_button': '🗑️ Limpar dados da sessão',
         'yahoo_unavailable_warning': 'Yahoo Finance indisponível para {missing}/{total} tickers. Usando preço médio como fallback.',
 
