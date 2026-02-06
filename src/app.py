@@ -344,25 +344,9 @@ div[data-testid="stHorizontalBlock"] { row-gap: 0.15rem; column-gap: 0.15rem; }
                 page_key = f"{key_prefix}_page"
 
                 page_size_options = [25, 50, 100, 200, 500]
+                page_size = int(st.session_state.get(page_size_key, 50))
 
-                # Avoid Streamlit warning: don't set widget state *and* also provide a default.
-                if page_size_key in st.session_state:
-                    page_size = st.selectbox(
-                        texts['pagination_page_size'],
-                        page_size_options,
-                        key=page_size_key,
-                        label_visibility="collapsed",
-                    )
-                else:
-                    page_size = st.selectbox(
-                        texts['pagination_page_size'],
-                        page_size_options,
-                        index=1,  # default 50
-                        key=page_size_key,
-                        label_visibility="collapsed",
-                    )
-
-                pages = max(1, (total + int(page_size) - 1) // int(page_size))
+                pages = max(1, (total + page_size - 1) // page_size)
 
                 if page_key not in st.session_state:
                     st.session_state[page_key] = 1
@@ -436,8 +420,14 @@ div[data-testid="stHorizontalBlock"] { row-gap: 0.15rem; column-gap: 0.15rem; }
                         st.session_state[page_key] = min(pages, page + 1)
                         st.rerun()
 
-                    # Page size selector is rendered above (avoid widget state warnings)
-                    cols[-1].markdown("")
+                    # Page size selector (right side)
+                    cols[-1].selectbox(
+                        texts['pagination_page_size'],
+                        page_size_options,
+                        index=page_size_options.index(page_size) if page_size in page_size_options else 1,
+                        key=page_size_key,
+                        label_visibility="collapsed",
+                    )
 
             # Stack tables vertically (with pagination) to avoid horizontal scrolling.
             st.subheader(texts['audit_fees'])
