@@ -44,10 +44,12 @@ with st.sidebar.expander(texts['sidebar_settings'], expanded=False):
             "EUR": "EUR (€)",
         }.get(code, str(code))
 
+    if "currency_code" not in st.session_state:
+        st.session_state.currency_code = "BRL"
+
     currency_code = st.radio(
         texts['currency_label'],
         currency_codes,
-        index=0,
         key="currency_code",
         format_func=fmt_currency,
     )
