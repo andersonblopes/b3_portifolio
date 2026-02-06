@@ -18,13 +18,31 @@ if 'audit_df' not in st.session_state:
 
 # Sidebar Controls
 # Note: this label is intentionally bilingual because we need the selection before we can load `texts`.
+
+# Persist language + currency in the URL query params as a hard guarantee against resets.
+# (Some reruns / browser behaviors can wipe session_state; query params survive reloads.)
+qp = st.query_params
+
 if "lang_choice" not in st.session_state:
-    st.session_state.lang_choice = "Português (Brasil)"
+    st.session_state.lang_choice = qp.get("lang", "Português (Brasil)")
+
+if "currency_code" not in st.session_state:
+    st.session_state.currency_code = qp.get("cur", "BRL")
+
+
+def _sync_lang_to_url():
+    st.query_params["lang"] = st.session_state.lang_choice
+
+
+def _sync_currency_to_url():
+    st.query_params["cur"] = st.session_state.currency_code
+
 
 lang_choice = st.sidebar.selectbox(
     "🌐 Language / Idioma",
     ["Português (Brasil)", "English"],
     key="lang_choice",
+    on_change=_sync_lang_to_url,
 )
 texts = LANGUAGES[lang_choice]
 
@@ -51,14 +69,12 @@ with st.sidebar.expander(texts['sidebar_settings'], expanded=False):
             "EUR": "EUR (€)",
         }.get(code, str(code))
 
-    if "currency_code" not in st.session_state:
-        st.session_state.currency_code = "BRL"
-
     currency_code = st.radio(
         texts['currency_label'],
         currency_codes,
         key="currency_code",
         format_func=fmt_currency,
+        on_change=_sync_currency_to_url,
     )
 
 with st.sidebar.expander(texts['sidebar_market'], expanded=False):
