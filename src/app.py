@@ -34,7 +34,22 @@ section[data-testid="stSidebar"] .stToggle label p { white-space: nowrap; }
 )
 
 with st.sidebar.expander(texts['sidebar_settings'], expanded=False):
-    currency_choice = st.radio(texts['currency_label'], ["BRL (R$)", "USD ($)", "EUR (€)"])
+    currency_options = ["BRL (R$)", "USD ($)", "EUR (€)"]
+
+    # Preserve currency selection across reruns (e.g., when changing language)
+    if "currency_choice" in st.session_state:
+        currency_choice = st.radio(
+            texts['currency_label'],
+            currency_options,
+            key="currency_choice",
+        )
+    else:
+        currency_choice = st.radio(
+            texts['currency_label'],
+            currency_options,
+            index=0,
+            key="currency_choice",
+        )
 
 with st.sidebar.expander(texts['sidebar_market'], expanded=False):
     # Market refresh (manual + optional auto)
