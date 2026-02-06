@@ -194,6 +194,8 @@ if st.session_state.raw_df is not None:
         types = sorted(portfolio_main['asset_type'].unique())
         for t in types:
             sub_df = portfolio_main[portfolio_main['asset_type'] == t].copy()
+            # Sort by yield ("Red.." / "Yield") descending
+            sub_df = sub_df.sort_values('yield', ascending=False)
             t_mkt = sub_df['v_mercado'].sum()
             weight = (t_mkt / mkt_total) * 100 if mkt_total > 0 else 0
             label_assets = texts['assets_count']
