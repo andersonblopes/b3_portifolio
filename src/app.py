@@ -113,12 +113,12 @@ if st.session_state.raw_df is not None:
             ev['val'] *= factor
             c1.plotly_chart(
                 charts.plot_evolution(ev.rename(columns={'val': 'flow'}), sym, is_usd, texts['chart_evolution']),
-                width="stretch",
+                use_container_width=True,
                 config=PLOTLY_CONFIG,
             )
         c2.plotly_chart(
             charts.plot_allocation(portfolio_main, 'asset_type', 'v_mercado', is_usd, texts['chart_allocation']),
-            width="stretch",
+            use_container_width=True,
             config=PLOTLY_CONFIG,
         )
 
@@ -128,7 +128,7 @@ if st.session_state.raw_df is not None:
         df_inst['val'] *= factor
         c3.plotly_chart(
             charts.plot_allocation(df_inst, 'inst', 'val', is_usd, texts['chart_asset_inst']),
-            width="stretch",
+            use_container_width=True,
             config=PLOTLY_CONFIG,
         )
 
@@ -140,7 +140,7 @@ if st.session_state.raw_df is not None:
             res_m = res_m.groupby('month_year')['val'].sum().reset_index().sort_values('month_year')
             c4.plotly_chart(
                 charts.plot_earnings_evolution(res_m, sym, is_usd, texts['chart_earn_monthly']),
-                width="stretch",
+                use_container_width=True,
                 config=PLOTLY_CONFIG,
             )
 
@@ -170,7 +170,7 @@ if st.session_state.raw_df is not None:
                         is_usd,
                         texts['chart_earn_type'],
                     ),
-                    width="stretch",
+                    use_container_width=True,
                     config=PLOTLY_CONFIG,
                 )
             with r1_c2:
@@ -183,7 +183,7 @@ if st.session_state.raw_df is not None:
                         is_usd,
                         texts['chart_earn_asset_type'],
                     ),
-                    width="stretch",
+                    use_container_width=True,
                     config=PLOTLY_CONFIG,
                 )
             st.divider()
