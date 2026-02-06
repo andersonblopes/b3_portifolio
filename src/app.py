@@ -38,7 +38,7 @@ with st.sidebar.expander(texts['sidebar_market'], expanded=False):
     from streamlit_autorefresh import st_autorefresh
 
     # Keep the label short to avoid wrapping in the sidebar.
-    auto_refresh = st.toggle(texts['auto_refresh_label'], value=False, help=texts['auto_refresh_help'])
+    auto_refresh = st.toggle(texts['auto_refresh_label'], value=True, help=texts['auto_refresh_help'])
 
     refresh_count = None
     refresh_interval_ms = None

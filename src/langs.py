@@ -77,7 +77,7 @@ LANGUAGES = {
         'exchange_rate_msg': 'Câmbio USD/BRL',
         'refresh_button': '🔄 Atualizar mercado',
         'refresh_toast': 'Atualizando dados de mercado...',
-        'auto_refresh_label': '⏱️ Atualização automática',
+        'auto_refresh_label': '⏱️ Auto',
         'auto_refresh_help': 'Atualiza cotações e câmbio em um intervalo de tempo',
         'refresh_interval_label': 'Intervalo',
         'refresh_interval_help': 'Frequência de atualização de cotação e câmbio',
