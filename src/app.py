@@ -343,13 +343,30 @@ div[data-testid="stHorizontalBlock"] { row-gap: 0.15rem; column-gap: 0.15rem; }
                 page_size_key = f"{key_prefix}_page_size"
                 page_key = f"{key_prefix}_page"
 
-                if page_size_key not in st.session_state:
-                    st.session_state[page_size_key] = 50
+                page_size_options = [25, 50, 100, 200, 500]
+
+                # Avoid Streamlit warning: don't set widget state *and* also provide a default.
+                if page_size_key in st.session_state:
+                    page_size = st.selectbox(
+                        texts['pagination_page_size'],
+                        page_size_options,
+                        key=page_size_key,
+                        label_visibility="collapsed",
+                    )
+                else:
+                    page_size = st.selectbox(
+                        texts['pagination_page_size'],
+                        page_size_options,
+                        index=1,  # default 50
+                        key=page_size_key,
+                        label_visibility="collapsed",
+                    )
+
+                pages = max(1, (total + int(page_size) - 1) // int(page_size))
+
                 if page_key not in st.session_state:
                     st.session_state[page_key] = 1
 
-                page_size = int(st.session_state[page_size_key])
-                pages = max(1, (total + page_size - 1) // page_size)
                 st.session_state[page_key] = max(1, min(int(st.session_state[page_key]), pages))
                 page = int(st.session_state[page_key])
 
@@ -419,14 +436,8 @@ div[data-testid="stHorizontalBlock"] { row-gap: 0.15rem; column-gap: 0.15rem; }
                         st.session_state[page_key] = min(pages, page + 1)
                         st.rerun()
 
-                    # Page size selector
-                    cols[-1].selectbox(
-                        texts['pagination_page_size'],
-                        [25, 50, 100, 200, 500],
-                        index=[25, 50, 100, 200, 500].index(page_size) if page_size in [25, 50, 100, 200, 500] else 1,
-                        key=page_size_key,
-                        label_visibility="collapsed",
-                    )
+                    # Page size selector is rendered above (avoid widget state warnings)
+                    cols[-1].markdown("")
 
             # Stack tables vertically (with pagination) to avoid horizontal scrolling.
             st.subheader(texts['audit_fees'])
