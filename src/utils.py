@@ -49,9 +49,13 @@ def detect_asset_type(ticker):
 
 
 def load_and_process_files(uploaded_files):
+    """Load B3 exported XLSX statements and return (normalized_df, import_stats_df)."""
+
     all_data = []
+    stats_rows = []
 
     for file in uploaded_files:
+        file_name = getattr(file, "name", "uploaded.xlsx")
         df = pd.read_excel(file)
 
         # --- Trading / Negotiation statement ---
@@ -70,6 +74,21 @@ def load_and_process_files(uploaded_files):
             temp.loc[movement.str.contains('VENDA', na=False), 'type'] = 'SELL'
 
             temp['source'] = 'NEG'
+
+            stats_rows.append(
+                {
+                    'file': file_name,
+                    'detected': 'NEG',
+                    'rows_total': int(len(temp)),
+                    'rows_buy': int((temp['type'] == 'BUY').sum()),
+                    'rows_sell': int((temp['type'] == 'SELL').sum()),
+                    'rows_earnings': 0,
+                    'rows_fees': 0,
+                    'rows_transfer': 0,
+                    'rows_ignored': int((temp['type'] == 'IGNORE').sum()),
+                }
+            )
+
             all_data.append(temp[temp['type'] != 'IGNORE'])
             continue
 
@@ -96,27 +115,56 @@ def load_and_process_files(uploaded_files):
 
             temp['val'] = pd.to_numeric(df['Valor da Operação'], errors='coerce').fillna(0) * sign
 
-            def map_earn(m):
-                terms = ['RENDIMENTO', 'DIVIDENDO', 'JCP', 'JUROS SOBRE', 'AMORTIZA']
-                return 'EARNINGS' if any(t in str(m).upper() for t in terms) else 'IGNORE'
+            def map_mov(m):
+                m_upper = str(m).upper()
 
-            temp['type'] = df['Movimentação'].apply(map_earn)
+                earn_terms = ['RENDIMENTO', 'DIVIDENDO', 'JCP', 'JUROS SOBRE', 'AMORTIZA']
+                fee_terms = ['TAXA', 'TARIFA', 'IR', 'IOF']
+                transfer_terms = ['TRANSFER', 'LIQUIDA']
+
+                if any(t in m_upper for t in earn_terms):
+                    return 'EARNINGS'
+                if any(t in m_upper for t in fee_terms):
+                    return 'FEES'
+                if any(t in m_upper for t in transfer_terms):
+                    return 'TRANSFER'
+                return 'IGNORE'
+
+            temp['type'] = df['Movimentação'].apply(map_mov)
 
             def classify_earning(m):
                 m_upper = str(m).upper()
                 if 'DIVIDENDO' in m_upper:
-                    return 'Dividendo'
+                    return 'Dividend'
                 if 'JUROS SOBRE' in m_upper or 'JCP' in m_upper:
                     return 'JCP'
                 if 'AMORTIZA' in m_upper:
-                    return 'Amortização'
-                return 'Rendimento'
+                    return 'Amortization'
+                return 'Income'
 
             temp['sub_type'] = df['Movimentação'].apply(classify_earning)
             temp['source'] = 'MOV'
+
+            stats_rows.append(
+                {
+                    'file': file_name,
+                    'detected': 'MOV',
+                    'rows_total': int(len(temp)),
+                    'rows_buy': 0,
+                    'rows_sell': 0,
+                    'rows_earnings': int((temp['type'] == 'EARNINGS').sum()),
+                    'rows_fees': int((temp['type'] == 'FEES').sum()),
+                    'rows_transfer': int((temp['type'] == 'TRANSFER').sum()),
+                    'rows_ignored': int((temp['type'] == 'IGNORE').sum()),
+                }
+            )
+
+            # Keep only earnings in the main dataset for now (so existing views remain consistent).
             all_data.append(temp[temp['type'] == 'EARNINGS'])
 
-    return pd.concat(all_data).sort_values(by='date', ascending=False) if all_data else pd.DataFrame()
+    out_df = pd.concat(all_data).sort_values(by='date', ascending=False) if all_data else pd.DataFrame()
+    stats_df = pd.DataFrame(stats_rows).sort_values(['file', 'detected']) if stats_rows else None
+    return out_df, stats_df
 
 
 def calculate_portfolio(df):

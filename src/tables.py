@@ -18,10 +18,10 @@ def render_portfolio_table(df, texts, fmt_func):
             texts['col_total_cost']: fmt_func,
             texts['market_value']: fmt_func,
             texts['col_pnl']: fmt_func,
-            texts['col_earnings']: fmt_func
+            texts['col_earnings']: fmt_func,
         }).background_gradient(subset=[texts['col_yield']], cmap='RdYlGn', vmin=-15, vmax=15),
-        use_container_width=True,
-        hide_index=True
+        width="stretch",
+        hide_index=True,
     )
 
 
@@ -35,11 +35,20 @@ def render_earnings_log(df, texts, fmt_func):
     })
 
     st.dataframe(
-        audit_df[[texts['col_date'], texts['col_ticker'], texts['col_inst'], texts['col_earning_type'],
-                  texts['col_earnings']]].style.format({
-            texts['col_date']: lambda x: x.strftime('%d/%m/%Y'),
-            texts['col_earnings']: fmt_func
-        }),
-        use_container_width=True,
-        hide_index=True
+        audit_df[
+            [
+                texts['col_date'],
+                texts['col_ticker'],
+                texts['col_inst'],
+                texts['col_earning_type'],
+                texts['col_earnings'],
+            ]
+        ].style.format(
+            {
+                texts['col_date']: lambda x: x.strftime('%d/%m/%Y'),
+                texts['col_earnings']: fmt_func,
+            }
+        ),
+        width="stretch",
+        hide_index=True,
     )
