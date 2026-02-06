@@ -20,10 +20,35 @@ texts = LANGUAGES[lang_choice]
 st.sidebar.divider()
 currency_choice = st.sidebar.radio(texts['currency_label'], ["BRL (R$)", "USD ($)"])
 
+# Market refresh (manual + optional auto)
+from streamlit_autorefresh import st_autorefresh
+
+auto_refresh = st.sidebar.toggle("⏱️ Auto-refresh market prices", value=False)
+
+# When enabled, rerun every minute.
+refresh_count = None
+if auto_refresh:
+    refresh_count = st_autorefresh(interval=60 * 1000, key="auto_market_refresh")
+
 # Market Refresh Logic
-if st.sidebar.button("🔄 Refresh Market Prices"):
+manual_refresh = st.sidebar.button("🔄 Refresh Market Prices")
+
+# Clear caches when the user clicks the button OR when the autorefresh ticks.
+# st_autorefresh returns an incrementing counter; use it to detect actual ticks.
+if 'last_auto_refresh_count' not in st.session_state:
+    st.session_state.last_auto_refresh_count = None
+
+auto_tick = (
+    auto_refresh
+    and refresh_count is not None
+    and refresh_count != st.session_state.last_auto_refresh_count
+)
+
+if manual_refresh or auto_tick:
     utils.fetch_market_prices.clear()  # Clears the cache for prices
     utils.get_exchange_rate.clear()  # Clears the cache for USD rate
+    if auto_tick:
+        st.session_state.last_auto_refresh_count = refresh_count
     st.toast("Updating live market data...", icon="⏳")
 
 rate = utils.get_exchange_rate()
