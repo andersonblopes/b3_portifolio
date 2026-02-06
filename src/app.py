@@ -14,7 +14,8 @@ if 'import_stats' not in st.session_state:
     st.session_state.import_stats = None
 
 # Sidebar Controls
-lang_choice = st.sidebar.selectbox("🌐 Idioma", ["Português (Brasil)", "English"])
+# Note: this label is intentionally bilingual because we need the selection before we can load `texts`.
+lang_choice = st.sidebar.selectbox("🌐 Language / Idioma", ["Português (Brasil)", "English"])
 texts = LANGUAGES[lang_choice]
 
 st.sidebar.divider()
@@ -24,17 +25,17 @@ currency_choice = st.sidebar.radio(texts['currency_label'], ["BRL (R$)", "USD ($
 from streamlit_autorefresh import st_autorefresh
 
 # Keep the label short to avoid wrapping in the sidebar.
-auto_refresh = st.sidebar.toggle("⏱️ Auto refresh", value=False, help="Auto refresh market prices on a timer")
+auto_refresh = st.sidebar.toggle(texts['auto_refresh_label'], value=False, help=texts['auto_refresh_help'])
 
 refresh_count = None
 refresh_interval_ms = None
 
 if auto_refresh:
     refresh_interval_label = st.sidebar.selectbox(
-        "Refresh interval",
+        texts['refresh_interval_label'],
         ["30s", "1m", "5m"],
         index=1,
-        help="How often to refresh market prices and FX rate",
+        help=texts['refresh_interval_help'],
     )
     refresh_interval_ms = {"30s": 30_000, "1m": 60_000, "5m": 300_000}[refresh_interval_label]
     refresh_count = st_autorefresh(interval=refresh_interval_ms, key="auto_market_refresh")
@@ -51,7 +52,7 @@ section[data-testid="stSidebar"] .stToggle label p { white-space: nowrap; }
 )
 
 # Market Refresh Logic
-manual_refresh = st.sidebar.button("🔄 Refresh Market Prices")
+manual_refresh = st.sidebar.button(texts['refresh_button'])
 
 # Clear caches when the user clicks the button OR when the autorefresh ticks.
 # st_autorefresh returns an incrementing counter; use it to detect actual ticks.
@@ -69,7 +70,7 @@ if manual_refresh or auto_tick:
     utils.get_exchange_rate.clear()  # Clears the cache for USD rate
     if auto_tick:
         st.session_state.last_auto_refresh_count = refresh_count
-    st.toast("Updating live market data...", icon="⏳")
+    st.toast(texts['refresh_toast'], icon="⏳")
 
 rate = utils.get_exchange_rate()
 st.sidebar.metric(label=texts['exchange_rate_msg'], value=f"R$ {rate:.2f}")
@@ -83,11 +84,11 @@ if uploaded_files:
 
 # Import summary
 if st.session_state.import_stats is not None and not st.session_state.import_stats.empty:
-    with st.sidebar.expander("📄 Import summary", expanded=False):
+    with st.sidebar.expander(texts['import_summary_label'], expanded=False):
         st.dataframe(st.session_state.import_stats, width="stretch", hide_index=True)
 
 # Option to clear session data
-if st.sidebar.button("🗑️ Clear All Data"):
+if st.sidebar.button(texts['clear_data_button']):
     st.session_state.raw_df = None
     st.session_state.import_stats = None
     st.rerun()
@@ -120,8 +121,10 @@ if st.session_state.raw_df is not None:
     live_count = sum(1 for t in tickers if prices.get(t, {}).get('live'))
     if tickers and live_count < len(tickers):
         st.sidebar.warning(
-            f"Yahoo Finance unavailable for {len(tickers) - live_count}/{len(tickers)} tickers. "
-            "Using average price as fallback for those assets."
+            texts['yahoo_unavailable_warning'].format(
+                missing=(len(tickers) - live_count),
+                total=len(tickers),
+            )
         )
 
     res = portfolio_main['ticker'].apply(
@@ -237,10 +240,9 @@ if st.session_state.raw_df is not None:
             st.subheader(texts['earnings_audit_title'])
             tables.render_earnings_log(earn_raw, texts, fmt_reg)
 else:
-    # Display the Welcome guide from image_5345f4.png
-    st.title("Bem-vindo ao B3 Master Portfolio")
-    st.subheader("Seu painel profissional de gestão de patrimônio.")
-    st.markdown("### 🚀 Guia de Início Rápido")
-    st.info("1. Acesse o [Portal do Investidor B3](https://www.investidor.b3.com.br/login)")
-    st.info("2. Baixe seus arquivos XLSX de **Negociação** e **Movimentação**.")
-    st.info("3. Arraste todos os arquivos para a barra lateral.")
+    st.title(texts['welcome_title'])
+    st.subheader(texts['welcome_subheader'])
+    st.markdown(f"### {texts['quick_start_title']}")
+    st.info(texts['quick_start_step1'])
+    st.info(texts['quick_start_step2'])
+    st.info(texts['quick_start_step3'])
