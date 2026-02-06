@@ -310,38 +310,50 @@ if st.session_state.raw_df is not None:
             transfers_df = audit_df[audit_df['type'] == 'TRANSFER'].copy()
             ignored_df = audit_df[audit_df['type'] == 'IGNORE'].copy()
 
-            # Stack tables vertically to avoid horizontal scrolling.
+            def render_paged_df(df: pd.DataFrame, columns: list[str], key_prefix: str):
+                if df.empty:
+                    st.caption("(none)")
+                    return
+
+                df2 = df[columns].sort_values('date', ascending=False)
+                total = len(df2)
+
+                c1, c2, c3 = st.columns([1, 1, 2])
+                with c1:
+                    page_size = st.selectbox(
+                        "Page size",
+                        [10, 25, 50, 100, 200],
+                        index=1,
+                        key=f"{key_prefix}_page_size",
+                    )
+                with c2:
+                    max_page = max(1, (total + page_size - 1) // page_size)
+                    page = st.number_input(
+                        "Page",
+                        min_value=1,
+                        max_value=max_page,
+                        value=1,
+                        step=1,
+                        key=f"{key_prefix}_page",
+                    )
+                with c3:
+                    start = (page - 1) * page_size
+                    end = min(start + page_size, total)
+                    st.caption(f"Showing {start + 1}-{end} of {total}")
+
+                st.dataframe(df2.iloc[start:end], width="stretch", hide_index=True)
+
+            # Stack tables vertically (with pagination) to avoid horizontal scrolling.
             st.subheader(texts['audit_fees'])
-            if fees_df.empty:
-                st.caption("(none)")
-            else:
-                st.dataframe(
-                    fees_df[['date', 'ticker', 'inst', 'val', 'desc']].sort_values('date', ascending=False),
-                    width="stretch",
-                    hide_index=True,
-                )
+            render_paged_df(fees_df, ['date', 'ticker', 'inst', 'val', 'desc'], key_prefix="audit_fees")
 
             st.divider()
             st.subheader(texts['audit_transfers'])
-            if transfers_df.empty:
-                st.caption("(none)")
-            else:
-                st.dataframe(
-                    transfers_df[['date', 'ticker', 'inst', 'val', 'desc']].sort_values('date', ascending=False),
-                    width="stretch",
-                    hide_index=True,
-                )
+            render_paged_df(transfers_df, ['date', 'ticker', 'inst', 'val', 'desc'], key_prefix="audit_transfers")
 
             st.divider()
             st.subheader(texts['audit_ignored'])
-            if ignored_df.empty:
-                st.caption("(none)")
-            else:
-                st.dataframe(
-                    ignored_df[['date', 'ticker', 'inst', 'val', 'desc', 'source']].sort_values('date', ascending=False),
-                    width="stretch",
-                    hide_index=True,
-                )
+            render_paged_df(ignored_df, ['date', 'ticker', 'inst', 'val', 'desc', 'source'], key_prefix="audit_ignored")
 else:
     st.title(texts['welcome_title'])
     st.subheader(texts['welcome_subheader'])
