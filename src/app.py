@@ -380,45 +380,47 @@ div[data-testid="stHorizontalBlock"] .stButton button {
                         prev = p
                     return out
 
-                st.caption(texts['pagination_showing'].format(start=start + 1, end=end, total=total))
-
                 items = page_buttons_window(page, pages)
 
-                # Controls row under the table: Prev | pages | Next | page size
-                cols = st.columns([1] + [1] * len(items) + [1, 2])
+                # Controls under the table, constrained to ~50% width (right column)
+                outer_left, outer_right = st.columns([1, 1])
+                with outer_right:
+                    st.caption(texts['pagination_showing'].format(start=start + 1, end=end, total=total))
 
-                # Prev
-                prev_disabled = page <= 1
-                if cols[0].button(texts['pagination_prev'], disabled=prev_disabled, key=f"{key_prefix}_prev"):
-                    st.session_state[page_key] = max(1, page - 1)
-                    st.rerun()
+                    cols = st.columns([1] + [1] * len(items) + [1, 2])
 
-                # Numbers
-                for i, it in enumerate(items, start=1):
-                    if it == '…':
-                        cols[i].markdown("…")
-                        continue
-
-                    p = int(it)
-                    is_current = p == page
-                    if cols[i].button(str(p), disabled=is_current, key=f"{key_prefix}_p_{p}"):
-                        st.session_state[page_key] = p
+                    # Prev
+                    prev_disabled = page <= 1
+                    if cols[0].button(texts['pagination_prev'], disabled=prev_disabled, key=f"{key_prefix}_prev"):
+                        st.session_state[page_key] = max(1, page - 1)
                         st.rerun()
 
-                # Next
-                next_disabled = page >= pages
-                if cols[-2].button(texts['pagination_next'], disabled=next_disabled, key=f"{key_prefix}_next"):
-                    st.session_state[page_key] = min(pages, page + 1)
-                    st.rerun()
+                    # Numbers
+                    for i, it in enumerate(items, start=1):
+                        if it == '…':
+                            cols[i].markdown("…")
+                            continue
 
-                # Page size selector (right-aligned-ish)
-                cols[-1].selectbox(
-                    texts['pagination_page_size'],
-                    [25, 50, 100, 200, 500],
-                    index=[25, 50, 100, 200, 500].index(page_size) if page_size in [25, 50, 100, 200, 500] else 1,
-                    key=page_size_key,
-                    label_visibility="collapsed",
-                )
+                        p = int(it)
+                        is_current = p == page
+                        if cols[i].button(str(p), disabled=is_current, key=f"{key_prefix}_p_{p}"):
+                            st.session_state[page_key] = p
+                            st.rerun()
+
+                    # Next
+                    next_disabled = page >= pages
+                    if cols[-2].button(texts['pagination_next'], disabled=next_disabled, key=f"{key_prefix}_next"):
+                        st.session_state[page_key] = min(pages, page + 1)
+                        st.rerun()
+
+                    # Page size selector
+                    cols[-1].selectbox(
+                        texts['pagination_page_size'],
+                        [25, 50, 100, 200, 500],
+                        index=[25, 50, 100, 200, 500].index(page_size) if page_size in [25, 50, 100, 200, 500] else 1,
+                        key=page_size_key,
+                        label_visibility="collapsed",
+                    )
 
             # Stack tables vertically (with pagination) to avoid horizontal scrolling.
             st.subheader(texts['audit_fees'])
