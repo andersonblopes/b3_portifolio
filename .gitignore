@@ -11,13 +11,19 @@ data/*.csv
 
 # === PYTHON (GENERAL) ===
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+
+# Virtual environments (root or nested)
 env/
 venv/
 .venv/
+**/venv/
+**/.venv/
+
 pip-log.txt
 pip-delete-this-directory.txt
 .toast

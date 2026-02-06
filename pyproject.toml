@@ -1,0 +1,25 @@
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+skip-string-normalization = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+# Keep it pragmatic: catch real bugs + enforce clean imports
+select = [
+  "E",   # pycodestyle errors
+  "F",   # pyflakes
+  "I",   # isort
+  "UP",  # pyupgrade
+  "B",   # bugbear
+]
+ignore = [
+  # Streamlit apps often use top-level imports/side effects; keep noise low initially.
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
