@@ -1,12 +1,25 @@
 import logging
 import re
 import warnings
+import unicodedata
 
 import pandas as pd
 import streamlit as st
 import yfinance as yf
 
 logger = logging.getLogger(__name__)
+
+
+def _norm(s: object) -> str:
+    """Normalize text for robust comparisons (uppercase + strip accents)."""
+    if s is None:
+        return ""
+    txt = str(s).strip().upper()
+    return (
+        unicodedata.normalize("NFKD", txt)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
 
 # Some B3 exports trigger this common openpyxl warning; keep other warnings visible.
 warnings.filterwarnings(
@@ -146,14 +159,15 @@ def load_and_process_files(uploaded_files):
             # Apply sign based on Entrada/Saída (Credito/Debito) when available.
             sign = 1
             if 'Entrada/Saída' in df.columns:
-                es = df['Entrada/Saída'].astype(str).str.upper()
+                es = df['Entrada/Saída'].map(_norm)
+                # Handles "Débito" / "Debito" / "DEBIT" variations
                 sign = es.map(lambda x: -1 if 'DEB' in x else 1).fillna(1)
 
             temp['val'] = pd.to_numeric(df['Valor da Operação'], errors='coerce').fillna(0) * sign
             temp['desc'] = df['Movimentação'].astype(str)
 
             def map_mov(m):
-                m_upper = str(m).upper()
+                m_upper = _norm(m)
 
                 earn_terms = ['RENDIMENTO', 'DIVIDENDO', 'JCP', 'JUROS SOBRE', 'AMORTIZA']
                 fee_terms = ['TAXA', 'TARIFA', 'IR', 'IOF']
@@ -170,7 +184,7 @@ def load_and_process_files(uploaded_files):
             temp['type'] = df['Movimentação'].apply(map_mov)
 
             def classify_earning(m):
-                m_upper = str(m).upper()
+                m_upper = _norm(m)
                 if 'DIVIDENDO' in m_upper:
                     return 'Dividend'
                 if 'JUROS SOBRE' in m_upper or 'JCP' in m_upper:
