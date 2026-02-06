@@ -334,24 +334,64 @@ if st.session_state.raw_df is not None:
                 st.session_state[page_key] = max(1, min(int(st.session_state[page_key]), pages))
                 page = int(st.session_state[page_key])
 
-                nav1, nav2, nav3 = st.columns([1, 1, 3])
-                with nav1:
-                    prev_disabled = page <= 1
-                    if st.button(texts['pagination_prev'], disabled=prev_disabled, key=f"{key_prefix}_prev"):
-                        st.session_state[page_key] = max(1, page - 1)
+                def page_buttons_window(curr: int, total_pages: int) -> list[int | str]:
+                    """Return a list like [1, '…', 4, 5, 6, '…', 20]."""
+                    if total_pages <= 7:
+                        return list(range(1, total_pages + 1))
+
+                    window = {1, total_pages}
+                    for p in range(curr - 1, curr + 2):
+                        if 1 <= p <= total_pages:
+                            window.add(p)
+
+                    # Also show page 2 and penultimate to reduce ellipsis jitter near edges
+                    if curr <= 3:
+                        window.update({2, 3, 4})
+                    if curr >= total_pages - 2:
+                        window.update({total_pages - 3, total_pages - 2, total_pages - 1})
+
+                    pages_sorted = sorted(p for p in window if 1 <= p <= total_pages)
+
+                    out: list[int | str] = []
+                    prev = None
+                    for p in pages_sorted:
+                        if prev is not None and p - prev > 1:
+                            out.append('…')
+                        out.append(p)
+                        prev = p
+                    return out
+
+                # Controls row (prev + numbers + next)
+                items = page_buttons_window(page, pages)
+                cols = st.columns([1] + [1] * len(items) + [1])
+
+                # Prev
+                prev_disabled = page <= 1
+                if cols[0].button(texts['pagination_prev'], disabled=prev_disabled, key=f"{key_prefix}_prev"):
+                    st.session_state[page_key] = max(1, page - 1)
+                    st.rerun()
+
+                # Numbers
+                for i, it in enumerate(items, start=1):
+                    if it == '…':
+                        cols[i].markdown("…")
+                        continue
+
+                    p = int(it)
+                    is_current = p == page
+                    if cols[i].button(str(p), disabled=is_current, key=f"{key_prefix}_p_{p}"):
+                        st.session_state[page_key] = p
                         st.rerun()
 
-                with nav2:
-                    next_disabled = page >= pages
-                    if st.button(texts['pagination_next'], disabled=next_disabled, key=f"{key_prefix}_next"):
-                        st.session_state[page_key] = min(pages, page + 1)
-                        st.rerun()
+                # Next
+                next_disabled = page >= pages
+                if cols[-1].button(texts['pagination_next'], disabled=next_disabled, key=f"{key_prefix}_next"):
+                    st.session_state[page_key] = min(pages, page + 1)
+                    st.rerun()
 
-                with nav3:
-                    start = (page - 1) * page_size
-                    end = min(start + page_size, total)
-                    st.caption(texts['pagination_page'].format(page=page, pages=pages))
-                    st.caption(texts['pagination_showing'].format(start=start + 1, end=end, total=total))
+                start = (page - 1) * page_size
+                end = min(start + page_size, total)
+                st.caption(texts['pagination_showing'].format(start=start + 1, end=end, total=total))
 
                 st.dataframe(df2.iloc[start:end], width="stretch", hide_index=True)
 
