@@ -30,7 +30,7 @@ section[data-testid="stSidebar"] .stToggle label p { white-space: nowrap; }
     unsafe_allow_html=True,
 )
 
-with st.sidebar.expander(texts['sidebar_settings'], expanded=True):
+with st.sidebar.expander(texts['sidebar_settings'], expanded=False):
     currency_choice = st.radio(texts['currency_label'], ["BRL (R$)", "USD ($)"])
 
 with st.sidebar.expander(texts['sidebar_market'], expanded=False):
@@ -76,7 +76,7 @@ with st.sidebar.expander(texts['sidebar_market'], expanded=False):
     rate = utils.get_exchange_rate()
     st.metric(label=texts['exchange_rate_msg'], value=f"R$ {rate:.2f}")
 
-with st.sidebar.expander(texts['sidebar_import'], expanded=True):
+with st.sidebar.expander(texts['sidebar_import'], expanded=False):
     uploaded_files = st.file_uploader(texts['upload_msg'], type=['xlsx'], accept_multiple_files=True)
 
     if uploaded_files:
