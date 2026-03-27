@@ -438,3 +438,192 @@ def test_calculate_portfolio_yfinance_splits_not_applied_when_mov_exists():
 
     # qty should be the MOV grupamento value (4.8), not double-applied
     assert row["qty"] == pytest.approx(4.8, abs=0.01)
+
+
+# --- analyze_position ---
+
+def test_analyze_position_returns_none_for_invalid_inputs():
+    assert utils.analyze_position("X3", qty=0, avg_price=10, total_cost=0, current_price=10, earnings=0, asset_type="Ação") is None
+    assert utils.analyze_position("X3", qty=10, avg_price=10, total_cost=100, current_price=0, earnings=0, asset_type="Ação") is None
+
+
+def test_analyze_position_gain_scenario_basic():
+    # 30% gain on 100 shares bought at R$10
+    result = utils.analyze_position(
+        ticker="PETR4",
+        qty=100,
+        avg_price=10.0,
+        total_cost=1000.0,
+        current_price=13.0,
+        earnings=0.0,
+        asset_type="Ação",
+    )
+    assert result is not None
+    assert result['scenario'] == 'gain'
+    assert result['yield_pct'] == pytest.approx(30.0)
+    # breakeven equals avg_price when earnings=0
+    assert result['breakeven'] == pytest.approx(10.0)
+    # trailing stop: 15% below current = 13 * 0.85 = 11.05; above breakeven so kept
+    assert result['trailing_stop'] == pytest.approx(13.0 * 0.85, abs=0.01)
+    # targets: +20% and +50% are above current (13.0 * 1.2 = 12 < 13 → only +50% and 2× remain)
+    prices_above_current = [t['price'] for t in result['targets']]
+    for p in prices_above_current:
+        assert p > 13.0
+
+
+def test_analyze_position_gain_targets_content():
+    result = utils.analyze_position(
+        ticker="VALE3",
+        qty=200,
+        avg_price=50.0,
+        total_cost=10000.0,
+        current_price=55.0,  # only +10%, all targets still ahead
+        earnings=0.0,
+        asset_type="Ação",
+    )
+    labels = [t['label'] for t in result['targets']]
+    assert 'target_20pct' in labels   # 50 * 1.20 = 60 > 55
+    assert 'target_50pct' in labels   # 50 * 1.50 = 75 > 55
+    assert 'target_double' in labels  # 50 * 2.00 = 100 > 55
+    # sell quantities follow the fractions: 25%, 33%, 50% of qty=200
+    qty_map = {t['label']: t['qty_to_sell'] for t in result['targets']}
+    assert qty_map['target_20pct'] == 50    # 200 * 0.25
+    assert qty_map['target_50pct'] == 66    # 200 * 0.33 rounded
+    assert qty_map['target_double'] == 100  # 200 * 0.50
+
+
+def test_analyze_position_all_targets_surpassed():
+    # current_price is already above 2× avg_price — no targets left
+    result = utils.analyze_position(
+        ticker="MGLU3",
+        qty=100,
+        avg_price=10.0,
+        total_cost=1000.0,
+        current_price=25.0,  # 150% gain, above 2× cost
+        earnings=0.0,
+        asset_type="Ação",
+    )
+    assert result['targets'] == []
+    assert 'note_high_gain' in result['notes']
+
+
+def test_analyze_position_loss_scenario_dca():
+    # 40% loss: avg=20, current=12 → DCA suggestions must be present
+    result = utils.analyze_position(
+        ticker="MGLU3",
+        qty=100,
+        avg_price=20.0,
+        total_cost=2000.0,
+        current_price=12.0,
+        earnings=0.0,
+        asset_type="Ação",
+    )
+    assert result['scenario'] == 'loss'
+    assert result['yield_pct'] == pytest.approx(-40.0)
+    assert 'note_deep_loss' in result['notes']
+    assert len(result['dca']) > 0
+    # verify DCA formula: for midpoint target = (20+12)/2 = 16
+    # add_qty = (2000 - 16*100) / (16 - 12) = (2000-1600)/4 = 100
+    midpoint_dca = next(d for d in result['dca'] if d['label'] == 'dca_50pct_recovery')
+    assert midpoint_dca['add_qty'] == pytest.approx(100.0, abs=0.5)
+    # new_avg after buying 100 more at 12: (2000 + 100*12) / 200 = 3200/200 = 16
+    assert midpoint_dca['new_avg'] == pytest.approx(16.0, abs=0.05)
+
+
+def test_analyze_position_flat_scenario():
+    # yield between 0% and 0.5% → flat
+    result = utils.analyze_position(
+        ticker="ABEV3",
+        qty=100,
+        avg_price=10.0,
+        total_cost=1000.0,
+        current_price=10.01,
+        earnings=0.0,
+        asset_type="Ação",
+    )
+    assert result['scenario'] == 'flat'
+
+
+def test_analyze_position_fii_trailing_stop_8pct():
+    result = utils.analyze_position(
+        ticker="KNRI11",
+        qty=50,
+        avg_price=100.0,
+        total_cost=5000.0,
+        current_price=120.0,
+        earnings=0.0,
+        asset_type="FII/ETF",
+    )
+    # FII uses 8% trail: 120 * 0.92 = 110.4; above breakeven (100), so kept
+    assert result['trailing_stop'] == pytest.approx(120.0 * 0.92, abs=0.01)
+
+
+def test_analyze_position_bdr_trailing_stop_12pct():
+    result = utils.analyze_position(
+        ticker="AAPL34",
+        qty=10,
+        avg_price=400.0,
+        total_cost=4000.0,
+        current_price=500.0,
+        earnings=0.0,
+        asset_type="BDR",
+    )
+    # BDR uses 12% trail: 500 * 0.88 = 440; above breakeven (400), so kept
+    assert result['trailing_stop'] == pytest.approx(500.0 * 0.88, abs=0.01)
+
+
+def test_analyze_position_trailing_stop_floored_at_breakeven():
+    # current_price barely above avg_price: trailing stop would go below cost → floor at breakeven
+    result = utils.analyze_position(
+        ticker="PETR4",
+        qty=100,
+        avg_price=10.0,
+        total_cost=1000.0,
+        current_price=10.5,    # only +5%; 15% trail = 8.925 < breakeven 10.0
+        earnings=0.0,
+        asset_type="Ação",
+    )
+    assert result['trailing_stop'] == pytest.approx(10.0, abs=0.01)
+
+
+def test_analyze_position_earnings_reduce_breakeven():
+    # R$200 of earnings on a R$1000 position → effective cost = R$800 → breakeven = R$8
+    result = utils.analyze_position(
+        ticker="ITUB4",
+        qty=100,
+        avg_price=10.0,
+        total_cost=1000.0,
+        current_price=11.0,
+        earnings=200.0,
+        asset_type="Ação",
+    )
+    assert result['breakeven'] == pytest.approx(8.0)
+    assert 'note_earnings_offset' in result['notes']
+
+
+def test_analyze_position_dca_top_up_only_when_yield_below_20():
+    # 10% gain — below the 20% threshold, so DCA top-up must be suggested
+    result_low = utils.analyze_position(
+        ticker="VALE3",
+        qty=100,
+        avg_price=50.0,
+        total_cost=5000.0,
+        current_price=55.0,
+        earnings=0.0,
+        asset_type="Ação",
+    )
+    assert result_low['dca'] is not None
+    assert len(result_low['dca']) > 0
+    assert result_low['dca'][0]['label'] == 'dca_topup'
+
+    # 25% gain — above threshold, no DCA suggested
+    result_high = utils.analyze_position(
+        ticker="VALE3",
+        qty=100,
+        avg_price=50.0,
+        total_cost=5000.0,
+        current_price=62.5,
+        earnings=0.0,
+        asset_type="Ação",
+    )
+    assert result_high['dca'] == [] or result_high['dca'] is None

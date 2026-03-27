@@ -359,6 +359,92 @@ if st.session_state.raw_df is not None:
             title = f"📁 {t} | {len(sub_df)} {label_assets} | {fmt_reg(t_mkt)} ({weight:.2f}%)"
             with st.expander(title, expanded=True):
                 tables.render_portfolio_table(sub_df, texts, fmt_reg)
+                # per-asset analysis picker — shown below the group table
+                _sel_key = f"analysis_sel_{t}"
+                _selected = st.selectbox(
+                    texts['analysis_select_label'],
+                    options=sub_df['ticker'].tolist(),
+                    index=None,
+                    placeholder=texts['analysis_select_placeholder'],
+                    key=_sel_key,
+                    label_visibility='collapsed',
+                )
+                if _selected:
+                    _has_live = prices.get(_selected, {}).get('p') is not None
+                    if not _has_live:
+                        st.warning(texts['analysis_no_data'])
+                    else:
+                        _row = sub_df[sub_df['ticker'] == _selected].iloc[0]
+                        _an = utils.analyze_position(
+                            ticker=_selected,
+                            qty=float(_row['qty']),
+                            avg_price=float(_row['avg_price']),
+                            total_cost=float(_row['total_cost']),
+                            current_price=float(_row['p_atual']),
+                            earnings=float(_row['earnings']),
+                            asset_type=str(_row['asset_type']),
+                        )
+                        if _an:
+                            with st.container(border=True):
+                                _scen = texts.get(
+                                    f'analysis_scenario_{_an["scenario"]}',
+                                    _an['scenario'],
+                                )
+                                st.markdown(
+                                    f"**{texts['analysis_title']}: {_selected}** — {_scen}"
+                                )
+                                _c1, _c2, _c3 = st.columns(3)
+                                _c1.metric(
+                                    texts['analysis_current_return'],
+                                    f"{_an['yield_pct']:+.1f}%",
+                                )
+                                _c2.metric(
+                                    texts['analysis_breakeven'],
+                                    fmt_reg(_an['breakeven']),
+                                )
+                                _c3.metric(
+                                    texts['analysis_trailing_stop'],
+                                    fmt_reg(_an['trailing_stop']),
+                                )
+                                if _an['targets']:
+                                    st.markdown(f"**{texts['analysis_targets_title']}**")
+                                    for _tgt in _an['targets']:
+                                        _lbl = texts.get(
+                                            f'analysis_{_tgt["label"]}',
+                                            _tgt['label'],
+                                        )
+                                        st.write(
+                                            f"• {_lbl} "
+                                            f"— {fmt_reg(_tgt['price'])}"
+                                            f" ({int(_tgt['qty_to_sell'])} units)"
+                                        )
+                                elif _an['scenario'] in ('gain', 'flat'):
+                                    st.write(texts['analysis_no_targets'])
+                                if _an['dca']:
+                                    st.markdown(f"**{texts['analysis_dca_title']}**")
+                                    for _d in _an['dca']:
+                                        _lbl = texts.get(
+                                            f'analysis_{_d["label"]}',
+                                            _d['label'],
+                                        )
+                                        _add_cap = round(
+                                            _d['add_qty'] * _d['add_price'], 2
+                                        )
+                                        st.write(
+                                            f"• {_lbl}: "
+                                            f"{texts['analysis_dca_add_qty']} "
+                                            f"{int(_d['add_qty'])} "
+                                            f"| {texts['analysis_dca_at_price']} "
+                                            f"{fmt_reg(_d['add_price'])} "
+                                            f"| {texts['analysis_dca_new_avg']} "
+                                            f"{fmt_reg(_d['new_avg'])} "
+                                            f"| {texts['analysis_dca_new_total']} "
+                                            f"{fmt_reg(_add_cap)}"
+                                        )
+                                elif _an['scenario'] == 'loss':
+                                    st.write(texts['analysis_no_dca'])
+                                for _note in _an['notes']:
+                                    st.info(texts.get(f'analysis_{_note}', _note))
 
     if has_earnings:
         with tabs[earnings_tab_idx]:  # Earnings

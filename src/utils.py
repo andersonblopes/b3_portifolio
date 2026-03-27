@@ -446,3 +446,128 @@ def fetch_market_prices(tickers):
     except Exception:
         logger.exception("yfinance batch download failed.")
     return prices
+
+
+def analyze_position(ticker, qty, avg_price, total_cost, current_price, earnings, asset_type):
+    """Return a structured position analysis with actionable recommendations.
+
+    Strategies applied:
+    - Gain scenario: trailing stop, partial-profit targets, DCA top-up sizing
+    - Loss scenario: DCA to reduce average, break-even study, max safe add-on
+
+    Returns a dict with keys:
+        scenario       : 'gain' | 'loss' | 'flat'
+        yield_pct      : float  (unrealised return %)
+        breakeven      : float  (price needed to recover total cost incl. earnings)
+        trailing_stop  : float
+        targets        : list of {'label': str, 'price': float, 'qty_to_sell': float}
+        dca            : list of {'label': str, 'add_qty': float, 'add_price': float,
+                                  'new_avg': float, 'new_total': float} | None
+        notes          : list of str (contextual observations)
+    """
+    if current_price <= 0 or qty <= 0:
+        return None
+
+    yield_pct = (current_price - avg_price) / avg_price * 100
+    market_value = current_price * qty
+
+    # effective breakeven accounting for earnings already received
+    effective_cost = max(total_cost - earnings, 0)
+    breakeven_price = effective_cost / qty if qty > 0 else avg_price
+
+    notes = []
+    targets = []
+    dca = None
+
+    # trailing stop levels: tighter for FIIs (less volatile), wider for stocks
+    # rule: protect at least the cost basis; floor at avg_price
+    if asset_type in ('FII/ETF',):
+        trail_pct = 0.08  # 8% trail for FIIs
+    elif asset_type == 'BDR':
+        trail_pct = 0.12  # 12% for BDRs (FX exposure)
+    else:
+        trail_pct = 0.15  # 15% for stocks
+
+    trailing_stop = max(current_price * (1 - trail_pct), breakeven_price)
+
+    if yield_pct >= 0:
+        scenario = 'gain' if yield_pct > 0.5 else 'flat'
+
+        # partial profit targets — classic pyramid scale-out
+        target_levels = [
+            ('target_20pct',    avg_price * 1.20, 0.25),   # sell 25% at +20%
+            ('target_50pct',    avg_price * 1.50, 0.33),   # sell 33% at +50%
+            ('target_double',   avg_price * 2.00, 0.50),   # sell 50% at 2×
+        ]
+        for label, price, frac in target_levels:
+            if price >= current_price:  # only show future targets
+                targets.append({
+                    'label': label,
+                    'price': round(price, 2),
+                    'qty_to_sell': round(qty * frac, 0),
+                })
+
+        # if already above +20%, suggest a top-up only if still below a base target
+        if yield_pct < 20:
+            # room to add: buy up to 50% more at current to keep avg cost reasonable
+            add_qty = round(qty * 0.50, 0)
+            new_qty = qty + add_qty
+            new_avg = (total_cost + add_qty * current_price) / new_qty
+            dca = [{
+                'label': 'dca_topup',
+                'add_qty': add_qty,
+                'add_price': current_price,
+                'new_avg': round(new_avg, 2),
+                'new_total': round(total_cost + add_qty * current_price, 2),
+            }]
+
+        if yield_pct > 50:
+            notes.append('note_high_gain')
+        if earnings / total_cost >= 0.05 if total_cost > 0 else False:
+            notes.append('note_earnings_offset')
+
+    else:
+        scenario = 'loss'
+
+        # DCA strategy: calculate how many shares to buy at each price level
+        # to move the average cost to a meaningful target
+        dca_levels = [
+            # target: midpoint between current price and original avg (50% recovery)
+            ('dca_50pct_recovery', (avg_price + current_price) / 2),
+            # target: 5% above current price (minimal viable recovery target)
+            ('dca_5pct_above',     current_price * 1.05),
+        ]
+        dca = []
+        for label, target_avg in dca_levels:
+            # add_qty = (total_cost - target_avg * qty) / (target_avg - current_price)
+            # valid only when target_avg > current_price
+            if target_avg <= current_price or target_avg >= avg_price:
+                continue
+            add_qty = (total_cost - target_avg * qty) / (target_avg - current_price)
+            if add_qty <= 0:
+                continue
+            add_qty = round(add_qty, 0)
+            new_qty = qty + add_qty
+            new_avg = (total_cost + add_qty * current_price) / new_qty
+            dca.append({
+                'label': label,
+                'add_qty': add_qty,
+                'add_price': current_price,
+                'new_avg': round(new_avg, 2),
+                'new_total': round(total_cost + add_qty * current_price, 2),
+            })
+
+        if abs(yield_pct) > 30:
+            notes.append('note_deep_loss')
+        if earnings > 0:
+            notes.append('note_earnings_offset')
+
+    return {
+        'scenario': scenario,
+        'yield_pct': round(yield_pct, 2),
+        'breakeven': round(breakeven_price, 2),
+        'trailing_stop': round(trailing_stop, 2),
+        'targets': targets,
+        'dca': dca or [],
+        'notes': notes,
+    }
