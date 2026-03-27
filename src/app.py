@@ -243,8 +243,9 @@ if st.session_state.raw_df is not None:
         with st.sidebar.expander(texts['missing_prices_expander'], expanded=False):
             st.write(", ".join(sorted(missing_tickers)))
 
+    # prices[t]['p'] can be None when brapi has no data; 'or 0' guards against None * factor
     res = portfolio_main['ticker'].apply(
-        lambda t: (prices.get(t, {}).get('p', 0) * factor, "✅" if prices.get(t, {}).get('live') else "⚠️"))
+        lambda t: ((prices.get(t, {}).get('p') or 0) * factor, "✅" if prices.get(t, {}).get('live') else "⚠️"))
 
     portfolio_main['p_atual'] = [
         x[0] if x[0] > 0 else portfolio_main.loc[portfolio_main['ticker'] == t, 'avg_price'].values[0] * factor
