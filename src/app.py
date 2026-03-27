@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import streamlit as st
 
@@ -15,6 +17,9 @@ if 'import_stats' not in st.session_state:
     st.session_state.import_stats = None
 if 'audit_df' not in st.session_state:
     st.session_state.audit_df = None
+if 'brapi_token' not in st.session_state:
+    # read from env var so users can set it once without re-entering each session
+    st.session_state.brapi_token = os.environ.get("BRAPI_TOKEN", "")
 
 # Sidebar Controls
 # Note: this label is intentionally bilingual because we need the selection before we can load `texts`.
@@ -151,7 +156,14 @@ with st.sidebar.expander(texts['sidebar_market'], expanded=False):
     else:
         fx_base = "USD"
 
-    rate = utils.get_exchange_rate(fx_base)
+    st.text_input(
+        texts['brapi_token_label'],
+        key="brapi_token",
+        type="password",
+        help=texts['brapi_token_help'],
+    )
+
+    rate = utils.get_exchange_rate(fx_base, token=st.session_state.brapi_token)
     st.metric(label=texts['fx_rate_msg'].format(base=fx_base), value=f"R$ {rate:.2f}")
 
 with st.sidebar.expander(texts['sidebar_import'], expanded=False):
@@ -216,7 +228,7 @@ if st.session_state.raw_df is not None:
 
     # Fetch fresh prices using the cached function
     tickers = portfolio_main['ticker'].unique().tolist()
-    prices = utils.fetch_market_prices(tickers)
+    prices = utils.fetch_market_prices(tickers, token=st.session_state.brapi_token)
 
     live_count = sum(1 for t in tickers if prices.get(t, {}).get('live'))
     missing_tickers = [t for t in tickers if not prices.get(t, {}).get('live')]

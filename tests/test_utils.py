@@ -131,12 +131,61 @@ def test_calculate_portfolio_clamps_sell_bigger_than_position():
     assert out.empty
 
 
-def test_get_exchange_rate_fallback_on_yahoo_error(monkeypatch):
+def test_get_exchange_rate_fallback_when_no_token():
+    # no token -> fixed fallback, no network call made
+    assert utils.get_exchange_rate.__wrapped__("USD", "") == 5.45
+    assert utils.get_exchange_rate.__wrapped__("EUR", "") == 5.90
+
+
+def test_get_exchange_rate_uses_brapi_response(monkeypatch):
+    from unittest.mock import MagicMock
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"currency": [{"bidPrice": "5.20"}]}
+    mock_resp.raise_for_status.return_value = None
+    monkeypatch.setattr(utils.requests, "get", lambda *a, **kw: mock_resp)
+
+    result = utils.get_exchange_rate.__wrapped__("USD", "test-token")
+    assert result == 5.20
+
+
+def test_get_exchange_rate_fallback_on_brapi_error(monkeypatch):
     def boom(*_args, **_kwargs):
-        raise RuntimeError("yahoo down")
+        raise RuntimeError("brapi down")
 
-    monkeypatch.setattr(utils.yf, "download", boom)
+    monkeypatch.setattr(utils.requests, "get", boom)
 
-    # Bypass Streamlit cache wrapper
-    assert utils.get_exchange_rate.__wrapped__("USD") == 5.45
-    assert utils.get_exchange_rate.__wrapped__("EUR") == 5.90
+    assert utils.get_exchange_rate.__wrapped__("USD", "test-token") == 5.45
+    assert utils.get_exchange_rate.__wrapped__("EUR", "test-token") == 5.90
+
+
+def test_fetch_market_prices_uses_brapi_response(monkeypatch):
+    from unittest.mock import MagicMock
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "results": [
+            {"symbol": "PETR4", "regularMarketPrice": 38.50},
+            {"symbol": "VALE3", "regularMarketPrice": 65.10},
+        ]
+    }
+    mock_resp.raise_for_status.return_value = None
+    monkeypatch.setattr(utils.requests, "get", lambda *a, **kw: mock_resp)
+
+    result = utils.fetch_market_prices.__wrapped__(["PETR4", "VALE3"], "test-token")
+    assert result["PETR4"] == {"p": 38.50, "live": True}
+    assert result["VALE3"] == {"p": 65.10, "live": True}
+
+
+def test_fetch_market_prices_fallback_on_brapi_error(monkeypatch):
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("brapi down")
+
+    monkeypatch.setattr(utils.requests, "get", boom)
+
+    result = utils.fetch_market_prices.__wrapped__(["PETR4"], "test-token")
+    assert result["PETR4"] == {"p": None, "live": False}
+
+
+def test_fetch_market_prices_returns_empty_for_no_tickers():
+    assert utils.fetch_market_prices.__wrapped__([], "") == {}

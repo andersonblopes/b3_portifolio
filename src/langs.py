@@ -25,8 +25,10 @@ LANGUAGES = {
         'sidebar_import': '📄 Import',
         'import_summary_label': 'Import summary',
         'clear_data_button': '🗑️ Clear session data',
+        'brapi_token_label': 'brapi.dev API token',
+        'brapi_token_help': 'Optional. Get a free token at brapi.dev to enable live prices and FX rates.',
         'yahoo_unavailable_warning': (
-            'Yahoo Finance unavailable for {missing}/{total} tickers. Using average cost as fallback.'
+            'Live prices unavailable for {missing}/{total} tickers. Using average cost as fallback.'
         ),
         'missing_prices_expander': 'Tickers without live price',
         'dedup_summary': 'Duplicates removed: {removed} rows (from {before} to {after})',
@@ -115,8 +117,10 @@ LANGUAGES = {
         'sidebar_import': '📄 Importação',
         'import_summary_label': 'Resumo da importação',
         'clear_data_button': '🗑️ Limpar dados da sessão',
+        'brapi_token_label': 'Token da API brapi.dev',
+        'brapi_token_help': 'Opcional. Obtenha um token gratuito em brapi.dev para cotações e câmbio em tempo real.',
         'yahoo_unavailable_warning': (
-            'Yahoo Finance indisponível para {missing}/{total} tickers. Usando preço médio como fallback.'
+            'Cotações indisponíveis para {missing}/{total} tickers. Usando preço médio como fallback.'
         ),
         'missing_prices_expander': 'Tickers sem cotação ao vivo',
         'dedup_summary': 'Duplicatas removidas: {removed} linhas (de {before} para {after})',
@@ -205,8 +209,10 @@ LANGUAGES = {
         'sidebar_import': '📄 Importación',
         'import_summary_label': 'Resumen de importación',
         'clear_data_button': '🗑️ Limpiar datos de la sesión',
+        'brapi_token_label': 'Token de API brapi.dev',
+        'brapi_token_help': 'Opcional. Obtenga un token gratuito en brapi.dev para cotizaciones y tipo de cambio en vivo.',
         'yahoo_unavailable_warning': (
-            'Yahoo Finance no disponible para {missing}/{total} tickers. Usando costo promedio como alternativa.'
+            'Cotizaciones no disponibles para {missing}/{total} tickers. Usando costo promedio como alternativa.'
         ),
         'missing_prices_expander': 'Tickers sin cotización en vivo',
         'dedup_summary': 'Duplicados eliminados: {removed} filas (de {before} a {after})',
@@ -295,8 +301,10 @@ LANGUAGES = {
         'sidebar_import': '📄 Import',
         'import_summary_label': 'Résumé d\'importation',
         'clear_data_button': '🗑️ Effacer les données de session',
+        'brapi_token_label': 'Jeton API brapi.dev',
+        'brapi_token_help': 'Optionnel. Obtenez un jeton gratuit sur brapi.dev pour les cours et taux de change en direct.',
         'yahoo_unavailable_warning': (
-            'Yahoo Finance indisponible pour {missing}/{total} tickers. Utilisation du coût moyen comme solution.'
+            'Cours indisponibles pour {missing}/{total} tickers. Utilisation du coût moyen comme solution.'
         ),
         'missing_prices_expander': 'Tickers sans prix en direct',
         'dedup_summary': 'Doublons supprimés : {removed} lignes (de {before} à {after})',

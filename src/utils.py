@@ -1,11 +1,12 @@
 import logging
+import os
 import re
 import warnings
 import unicodedata
 
 import pandas as pd
+import requests
 import streamlit as st
-import yfinance as yf
 
 logger = logging.getLogger(__name__)
 
@@ -31,29 +32,32 @@ warnings.filterwarnings(
 
 
 @st.cache_data(ttl=3600)
-def get_exchange_rate(base_currency: str = "USD"):
-    """Fetch FX rate for base_currency/BRL.
+def get_exchange_rate(base_currency: str = "USD", token: str = ""):
+    """Fetch FX rate for base_currency/BRL via brapi.dev.
 
-    Examples:
-      - USD/BRL: base_currency="USD" -> ticker "USDBRL=X"
-      - EUR/BRL: base_currency="EUR" -> ticker "EURBRL=X"
-
-    Falls back to a fixed value if Yahoo Finance is unavailable.
+    Requires a brapi.dev token. Falls back to a fixed value when no token is
+    provided or the request fails.
     """
     base = str(base_currency).upper().strip()
 
-    # Simple fallbacks (used only when Yahoo is unavailable)
+    # fixed fallbacks used when brapi is unavailable or token is missing
     fallback = {"USD": 5.45, "EUR": 5.90}.get(base, 5.45)
 
+    if not token:
+        logger.warning("No brapi token; using fixed fallback FX rate for %s/BRL.", base)
+        return float(fallback)
+
     try:
-        data = yf.download(f"{base}BRL=X", period="1d", progress=False)
-        close = data["Close"].dropna()
-        return float(close.iloc[-1])
-    except Exception:
-        logger.exception(
-            "Failed to fetch %s/BRL exchange rate from Yahoo Finance. Using fallback rate.",
-            base,
+        resp = requests.get(
+            "https://brapi.dev/api/v2/currency",
+            params={"currency": f"{base}-BRL"},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
         )
+        resp.raise_for_status()
+        return float(resp.json()["currency"][0]["bidPrice"])
+    except Exception:
+        logger.exception("Failed to fetch %s/BRL from brapi.dev. Using fallback.", base)
         return float(fallback)
 
 
@@ -315,18 +319,23 @@ def calculate_portfolio(df):
 
 
 @st.cache_data(ttl=3600)
-def fetch_market_prices(tickers):
-    if not tickers: return {}
-    prices = {}
+def fetch_market_prices(tickers, token: str = ""):
+    if not tickers:
+        return {}
+    prices = {t: {"p": None, "live": False} for t in tickers}
     try:
-        data = yf.download([f"{t}.SA" for t in tickers], period="1d", progress=False, group_by='ticker')
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        resp = requests.get(
+            f"https://brapi.dev/api/quote/{','.join(tickers)}",
+            headers=headers,
+            timeout=15,
+        )
+        resp.raise_for_status()
+        results_map = {r["symbol"]: r for r in resp.json().get("results", [])}
         for t in tickers:
-            try:
-                s = f"{t}.SA"
-                price = data[s]['Close'].iloc[-1].item() if len(tickers) > 1 else data['Close'].iloc[-1].item()
-                prices[t] = {"p": price, "live": True}
-            except:
-                prices[t] = {"p": None, "live": False}
-    except:
-        for t in tickers: prices[t] = {"p": None, "live": False}
+            r = results_map.get(t)
+            if r and r.get("regularMarketPrice") is not None:
+                prices[t] = {"p": float(r["regularMarketPrice"]), "live": True}
+    except Exception:
+        logger.exception("Failed to fetch prices from brapi.dev.")
     return prices

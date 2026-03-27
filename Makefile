@@ -24,4 +24,4 @@ format:
 	venv/bin/black .
 
 test:
-	venv/bin/pytest
+	venv/bin/python -m pytest --cov=src

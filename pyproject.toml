@@ -23,3 +23,10 @@ known-first-party = ["src"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
+
+[tool.coverage.run]
+# app.py is the Streamlit entrypoint — not unit-testable without a running server
+omit = ["src/app.py"]
+
+[tool.coverage.report]
+fail_under = 90

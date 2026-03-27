@@ -4,14 +4,14 @@ A **Streamlit** financial dashboard to consolidate **B3 (Brazilian Stock Exchang
 performance, passive income and asset allocation.
 
 > **Privacy:** your `.xlsx` files are processed locally.
-> **Internet:** the app can optionally query **Yahoo Finance (yfinance)** for market prices and FX rates (e.g., **USD/BRL**, **EUR/BRL**).
+> **Internet:** the app can optionally query **brapi.dev** for live market prices and FX rates (e.g., **USD/BRL**, **EUR/BRL**). A free token is required — get one at https://brapi.dev/dashboard.
 
 ## 🚀 Features
 
 - **Multi-file upload**: upload multiple B3 `.xlsx` statements at once.
 - **Multi-currency**: toggle between **BRL (R$)**, **USD ($)** and **EUR (€)**.
 - **Internationalization**: **English**, **Português**, **Español** and **Français**.
-- **Market data (optional)**: Yahoo Finance integration for prices + FX rates.
+- **Market data (optional)**: brapi.dev integration for live prices + FX rates (free token required).
 - **Visual analytics**:
   - Portfolio evolution (cumulative flow)
   - Monthly passive income
@@ -111,7 +111,7 @@ Run:
 ## 🧯 Troubleshooting
 
 - **Nothing shows up after upload**: verify the file contains the expected columns (see “Expected input files”).
-- **Prices / FX do not refresh**: Yahoo Finance may be rate-limited or temporarily unstable. Try again later.
+- **Prices / FX do not refresh**: make sure your brapi.dev token is entered in the sidebar or set via the `BRAPI_TOKEN` environment variable. Get a free token at https://brapi.dev/dashboard.
 - **Language or currency resets after reload**: the app persists these settings in the URL (query params like `?lang=pt&cur=EUR`).
 - **XLSX read errors**: upgrade dependencies and make sure the file is not corrupted.
 
