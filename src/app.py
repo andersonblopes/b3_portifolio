@@ -1,5 +1,3 @@
-import os
-
 import pandas as pd
 import streamlit as st
 
@@ -17,9 +15,6 @@ if 'import_stats' not in st.session_state:
     st.session_state.import_stats = None
 if 'audit_df' not in st.session_state:
     st.session_state.audit_df = None
-if 'brapi_token' not in st.session_state:
-    # read from env var so users can set it once without re-entering each session
-    st.session_state.brapi_token = os.environ.get("BRAPI_TOKEN", "")
 
 # Sidebar Controls
 # Note: this label is intentionally bilingual because we need the selection before we can load `texts`.
@@ -156,17 +151,7 @@ with st.sidebar.expander(texts['sidebar_market'], expanded=False):
     else:
         fx_base = "USD"
 
-    st.text_input(
-        texts['brapi_token_label'],
-        key="brapi_token",
-        type="password",
-        help=texts['brapi_token_help'],
-    )
-
-    if not st.session_state.brapi_token:
-        st.warning(texts['brapi_token_missing_warning'])
-
-    rate = utils.get_exchange_rate(fx_base, token=st.session_state.brapi_token)
+    rate = utils.get_exchange_rate(fx_base)
     st.metric(label=texts['fx_rate_msg'].format(base=fx_base), value=f"R$ {rate:.2f}")
 
 with st.sidebar.expander(texts['sidebar_import'], expanded=False):
@@ -246,7 +231,7 @@ if st.session_state.raw_df is not None:
         with st.sidebar.expander(texts['missing_prices_expander'], expanded=False):
             st.write(", ".join(sorted(missing_tickers)))
 
-    # prices[t]['p'] can be None when brapi has no data; 'or 0' guards against None * factor
+    # prices[t]['p'] can be None when yfinance has no data; 'or 0' guards against None * factor
     res = portfolio_main['ticker'].apply(
         lambda t: ((prices.get(t, {}).get('p') or 0) * factor, "✅" if prices.get(t, {}).get('live') else "⚠️"))
 

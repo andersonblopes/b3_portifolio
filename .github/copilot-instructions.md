@@ -121,6 +121,6 @@ When testing locally, referencing sample files, or pointing the app at real stat
 
 ## Known Limitations / Watch Points
 - **Market prices** are fetched via **yfinance** using the `.SA` suffix (covers all B3 tickers). No token required.
-- **FX rates** (USD/BRL, EUR/BRL) are fetched from **brapi.dev**. A free token is optional; without one the app falls back to fixed rates. Get a token at https://brapi.dev/dashboard and set it via the sidebar or the `BRAPI_TOKEN` env var.
+- **FX rates** (USD/BRL, EUR/BRL) are also fetched via **yfinance** (`USDBRL=X`, `EURBRL=X`). Falls back to fixed rates (USD 5.45, EUR 5.90) if yfinance is unavailable.
 - `calculate_portfolio` iterates row-by-row in Python — acceptable for personal statement sizes, but avoid adding more loop-based logic there.
 - `detect_asset_type` uses simple suffix matching; edge cases (e.g. single-letter tickers) may misclassify.

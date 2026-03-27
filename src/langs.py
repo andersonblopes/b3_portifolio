@@ -25,9 +25,6 @@ LANGUAGES = {
         'sidebar_import': '📄 Import',
         'import_summary_label': 'Import summary',
         'clear_data_button': '🗑️ Clear session data',
-        'brapi_token_label': 'brapi.dev API token',
-        'brapi_token_help': 'Optional. Get a free token at brapi.dev to enable live FX rates (USD/BRL, EUR/BRL). Prices are fetched from Yahoo Finance.',
-        'brapi_token_missing_warning': 'No brapi token set — FX rates will use fixed fallback values. Get a free token at brapi.dev/dashboard.',
         'yahoo_unavailable_warning': (
             'Live prices unavailable for {missing}/{total} tickers. Using average cost as fallback.'
         ),
@@ -118,9 +115,6 @@ LANGUAGES = {
         'sidebar_import': '📄 Importação',
         'import_summary_label': 'Resumo da importação',
         'clear_data_button': '🗑️ Limpar dados da sessão',
-        'brapi_token_label': 'Token da API brapi.dev',
-        'brapi_token_help': 'Opcional. Obtenha um token gratuito em brapi.dev para câmbio em tempo real (USD/BRL, EUR/BRL). Cotações são obtidas do Yahoo Finance.',
-        'brapi_token_missing_warning': 'Token brapi não configurado — câmbio usará valores fixos de fallback. Obtenha um token gratuito em brapi.dev/dashboard.',
         'yahoo_unavailable_warning': (
             'Cotações indisponíveis para {missing}/{total} tickers. Usando preço médio como fallback.'
         ),
@@ -211,9 +205,6 @@ LANGUAGES = {
         'sidebar_import': '📄 Importación',
         'import_summary_label': 'Resumen de importación',
         'clear_data_button': '🗑️ Limpiar datos de la sesión',
-        'brapi_token_label': 'Token de API brapi.dev',
-        'brapi_token_help': 'Opcional. Obtenga un token gratuito en brapi.dev para tipo de cambio en vivo (USD/BRL, EUR/BRL). Las cotizaciones se obtienen de Yahoo Finance.',
-        'brapi_token_missing_warning': 'Token brapi no configurado — el tipo de cambio usará valores fijos. Obtenga un token gratuito en brapi.dev/dashboard.',
         'yahoo_unavailable_warning': (
             'Cotizaciones no disponibles para {missing}/{total} tickers. Usando costo promedio como alternativa.'
         ),
@@ -304,9 +295,6 @@ LANGUAGES = {
         'sidebar_import': '📄 Import',
         'import_summary_label': 'Résumé d\'importation',
         'clear_data_button': '🗑️ Effacer les données de session',
-        'brapi_token_label': 'Jeton API brapi.dev',
-        'brapi_token_help': 'Optionnel. Obtenez un jeton gratuit sur brapi.dev pour les taux de change en direct (USD/BRL, EUR/BRL). Les cours sont obtenus via Yahoo Finance.',
-        'brapi_token_missing_warning': 'Jeton brapi non configuré — les taux de change utiliseront des valeurs fixes. Obtenez un jeton gratuit sur brapi.dev/dashboard.',
         'yahoo_unavailable_warning': (
             'Cours indisponibles pour {missing}/{total} tickers. Utilisation du coût moyen comme solution.'
         ),

@@ -170,32 +170,24 @@ def test_calculate_portfolio_clamps_sell_bigger_than_position():
     assert out.empty
 
 
-def test_get_exchange_rate_fallback_when_no_token():
-    # no token -> fixed fallback, no network call made
-    assert utils.get_exchange_rate.__wrapped__("USD", "") == 5.45
-    assert utils.get_exchange_rate.__wrapped__("EUR", "") == 5.90
+def test_get_exchange_rate_uses_yfinance_response(monkeypatch):
+    import pandas as pd
 
+    data = pd.DataFrame({"Close": [5.20]})
+    monkeypatch.setattr(utils.yf, "download", lambda *a, **kw: data)
 
-def test_get_exchange_rate_uses_brapi_response(monkeypatch):
-    from unittest.mock import MagicMock
-
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {"currency": [{"bidPrice": "5.20"}]}
-    mock_resp.raise_for_status.return_value = None
-    monkeypatch.setattr(utils.requests, "get", lambda *a, **kw: mock_resp)
-
-    result = utils.get_exchange_rate.__wrapped__("USD", "test-token")
+    result = utils.get_exchange_rate.__wrapped__("USD")
     assert result == 5.20
 
 
-def test_get_exchange_rate_fallback_on_brapi_error(monkeypatch):
+def test_get_exchange_rate_fallback_on_yfinance_error(monkeypatch):
     def boom(*_args, **_kwargs):
-        raise RuntimeError("brapi down")
+        raise RuntimeError("yfinance down")
 
-    monkeypatch.setattr(utils.requests, "get", boom)
+    monkeypatch.setattr(utils.yf, "download", boom)
 
-    assert utils.get_exchange_rate.__wrapped__("USD", "test-token") == 5.45
-    assert utils.get_exchange_rate.__wrapped__("EUR", "test-token") == 5.90
+    assert utils.get_exchange_rate.__wrapped__("USD") == 5.45
+    assert utils.get_exchange_rate.__wrapped__("EUR") == 5.90
 
 
 def test_fetch_market_prices_uses_yfinance_response(monkeypatch):

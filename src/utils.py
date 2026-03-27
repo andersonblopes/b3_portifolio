@@ -5,7 +5,6 @@ import warnings
 import unicodedata
 
 import pandas as pd
-import requests
 import streamlit as st
 import yfinance as yf
 
@@ -33,32 +32,19 @@ warnings.filterwarnings(
 
 
 @st.cache_data(ttl=3600)
-def get_exchange_rate(base_currency: str = "USD", token: str = ""):
-    """Fetch FX rate for base_currency/BRL via brapi.dev.
+def get_exchange_rate(base_currency: str = "USD"):
+    """Fetch FX rate for base_currency/BRL via yfinance.
 
-    Requires a brapi.dev token. Falls back to a fixed value when no token is
-    provided or the request fails.
+    Falls back to a fixed value when yfinance is unavailable.
     """
     base = str(base_currency).upper().strip()
-
-    # fixed fallbacks used when brapi is unavailable or token is missing
     fallback = {"USD": 5.45, "EUR": 5.90}.get(base, 5.45)
-
-    if not token:
-        logger.warning("No brapi token; using fixed fallback FX rate for %s/BRL.", base)
-        return float(fallback)
-
     try:
-        resp = requests.get(
-            "https://brapi.dev/api/v2/currency",
-            params={"currency": f"{base}-BRL"},
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        return float(resp.json()["currency"][0]["bidPrice"])
+        fx_ticker = f"{base}BRL=X"
+        data = yf.download(fx_ticker, period="1d", progress=False, auto_adjust=True)
+        return float(data["Close"].dropna().iloc[-1].item())
     except Exception:
-        logger.exception("Failed to fetch %s/BRL from brapi.dev. Using fallback.", base)
+        logger.exception("Failed to fetch %s/BRL from yfinance. Using fallback.", base)
         return float(fallback)
 
 
