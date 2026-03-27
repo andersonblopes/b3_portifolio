@@ -46,6 +46,57 @@ def _show_analysis_modal(ticker, analysis, fmt_reg, texts):
     for _note in analysis['notes']:
         st.info(texts.get(f'analysis_{_note}', _note))
 
+
+@st.fragment
+def _data_lab_groups():
+    """Render asset-type expanders with selectable tables inside the Data Lab tab.
+
+    Defined as a fragment so that row-click reruns only this section and do not
+    reset the active tab back to the first one.
+    """
+    _pm = st.session_state._lab_pm
+    _texts = st.session_state._lab_texts
+    _fmt = st.session_state._lab_fmt
+    _prices = st.session_state._lab_prices
+    _mkt_total = st.session_state._lab_mkt_total
+
+    types = sorted(_pm['asset_type'].unique())
+    for t in types:
+        sub_df = _pm[_pm['asset_type'] == t].copy()
+        sub_df = sub_df.sort_values('yield', ascending=False).reset_index(drop=True)
+        t_mkt = sub_df['v_mercado'].sum()
+        weight = (t_mkt / _mkt_total) * 100 if _mkt_total > 0 else 0
+        label_assets = _texts['assets_count']
+        title = f"📁 {t} | {len(sub_df)} {label_assets} | {_fmt(t_mkt)} ({weight:.2f}%)"
+        with st.expander(title, expanded=True):
+            _tbl_key = f"tbl_{t}"
+            _prev_key = f"_analysis_prev_{t}"
+            event = tables.render_portfolio_table(
+                sub_df, _texts, _fmt, selectable=True, table_key=_tbl_key
+            )
+            if event and event.selection.rows:
+                _idx = event.selection.rows[0]
+                _ticker = sub_df.iloc[_idx]['ticker']
+                # only open modal on a new selection; prevents reopening after dismiss
+                if st.session_state.get(_prev_key) != _ticker:
+                    st.session_state[_prev_key] = _ticker
+                    _row = sub_df.iloc[_idx]
+                    _has_live = _prices.get(_ticker, {}).get('p') is not None
+                    if _has_live:
+                        _an = utils.analyze_position(
+                            ticker=_ticker,
+                            qty=float(_row['qty']),
+                            avg_price=float(_row['avg_price']),
+                            total_cost=float(_row['total_cost']),
+                            current_price=float(_row['p_atual']),
+                            earnings=float(_row['earnings']),
+                            asset_type=str(_row['asset_type']),
+                        )
+                    else:
+                        _an = None
+                    _show_analysis_modal(_ticker, _an, _fmt, _texts)
+
+
 # Initialization of Session State
 if 'raw_df' not in st.session_state:
     st.session_state.raw_df = None
@@ -386,42 +437,13 @@ if st.session_state.raw_df is not None:
 
     with tabs[1]:  # Data Lab
         st.write(texts['status_legend'])
-        types = sorted(portfolio_main['asset_type'].unique())
-        for t in types:
-            sub_df = portfolio_main[portfolio_main['asset_type'] == t].copy()
-            # Sort by yield ("Red.." / "Yield") descending
-            sub_df = sub_df.sort_values('yield', ascending=False).reset_index(drop=True)
-            t_mkt = sub_df['v_mercado'].sum()
-            weight = (t_mkt / mkt_total) * 100 if mkt_total > 0 else 0
-            label_assets = texts['assets_count']
-            title = f"📁 {t} | {len(sub_df)} {label_assets} | {fmt_reg(t_mkt)} ({weight:.2f}%)"
-            with st.expander(title, expanded=True):
-                _tbl_key = f"tbl_{t}"
-                _prev_key = f"_analysis_prev_{t}"
-                event = tables.render_portfolio_table(
-                    sub_df, texts, fmt_reg, selectable=True, table_key=_tbl_key
-                )
-                if event and event.selection.rows:
-                    _idx = event.selection.rows[0]
-                    _ticker = sub_df.iloc[_idx]['ticker']
-                    # only open modal on a new selection; prevents reopening after dismiss
-                    if st.session_state.get(_prev_key) != _ticker:
-                        st.session_state[_prev_key] = _ticker
-                        _row = sub_df.iloc[_idx]
-                        _has_live = prices.get(_ticker, {}).get('p') is not None
-                        if _has_live:
-                            _an = utils.analyze_position(
-                                ticker=_ticker,
-                                qty=float(_row['qty']),
-                                avg_price=float(_row['avg_price']),
-                                total_cost=float(_row['total_cost']),
-                                current_price=float(_row['p_atual']),
-                                earnings=float(_row['earnings']),
-                                asset_type=str(_row['asset_type']),
-                            )
-                        else:
-                            _an = None
-                        _show_analysis_modal(_ticker, _an, fmt_reg, texts)
+        # store runtime values so the fragment can read them without argument-serialization issues
+        st.session_state._lab_pm = portfolio_main
+        st.session_state._lab_texts = texts
+        st.session_state._lab_fmt = fmt_reg
+        st.session_state._lab_prices = prices
+        st.session_state._lab_mkt_total = mkt_total
+        _data_lab_groups()
 
     if has_earnings:
         with tabs[earnings_tab_idx]:  # Earnings
