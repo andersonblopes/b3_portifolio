@@ -160,7 +160,7 @@ def _data_lab_groups():
                     _row = sub_df.iloc[_idx]
                     _has_live = _prices.get(_ticker, {}).get('p') is not None
                     if _has_live:
-                    _an = utils.analyze_position(
+                        _an = utils.analyze_position(
                             ticker=_ticker,
                             qty=float(_row['qty']),
                             avg_price=float(_row['avg_price']),
