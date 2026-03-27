@@ -16,14 +16,37 @@ def _show_analysis_modal(ticker, analysis, fmt_reg, texts):
         st.warning(texts['analysis_no_data'])
         return
 
+    # _mdfmt escapes '$' so Streamlit markdown does not treat it as a LaTeX delimiter.
+    # use this wherever fmt_reg output is embedded inside a markdown string.
+    # st.metric values are plain text and do not need escaping.
+    _mdfmt = lambda v: fmt_reg(v).replace('$', r'\$')  # noqa: E731
+
     rec = analysis['recommendation']
     rec_badge = texts.get(f'rec_{rec}', rec.upper())
     _scen = texts.get(f'analysis_scenario_{analysis["scenario"]}', analysis['scenario'])
+    _yoc = analysis.get('yield_on_cost', 0.0)
 
-    # header: ticker/scenario on the left, recommendation badge on the right
+    # pick rationale key once; reused in the popover and nowhere else
+    if rec == 'exit':
+        _rationale_key = 'rec_rationale_exit'
+    elif rec == 'trim':
+        _rationale_key = 'rec_rationale_trim'
+    elif rec == 'dca':
+        _rationale_key = 'rec_rationale_dca'
+    elif _yoc >= 8.0 and analysis['scenario'] == 'loss':
+        _rationale_key = 'rec_rationale_hold_dividend'
+    elif analysis['scenario'] in ('gain', 'flat'):
+        _rationale_key = 'rec_rationale_hold'
+    else:
+        _rationale_key = 'rec_rationale_hold_concentration'
+
+    # header: ticker + scenario on the left; recommendation badge + rationale popover on the right
     _hc1, _hc2 = st.columns([3, 1])
     _hc1.markdown(f"**{texts['analysis_title']}: {ticker}** — {_scen}")
-    _hc2.markdown(f"**{texts['analysis_rec_label']}:** {rec_badge}")
+    with _hc2:
+        st.markdown(f"**{texts['analysis_rec_label']}:** {rec_badge}")
+        with st.popover(texts['rec_rationale_title'], use_container_width=True):
+            st.markdown(texts[_rationale_key])
 
     # executive summary — one sentence chosen by recommendation + context
     st.divider()
@@ -34,7 +57,7 @@ def _show_analysis_modal(ticker, analysis, fmt_reg, texts):
         _exec_key = 'exec_trim'
     elif rec == 'hold' and analysis['scenario'] in ('gain', 'flat'):
         _exec_key = 'exec_hold_gain'
-    elif rec == 'hold' and analysis.get('yield_on_cost', 0.0) >= 8.0:
+    elif rec == 'hold' and _yoc >= 8.0:
         _exec_key = 'exec_hold_dividend'
     elif rec == 'hold':
         _exec_key = 'exec_hold_concentration'
@@ -42,14 +65,19 @@ def _show_analysis_modal(ticker, analysis, fmt_reg, texts):
         _exec_key = 'exec_dca'
     st.info(texts[_exec_key])
 
-    # key metrics row
+    # key metrics — each carries a help tooltip explaining what it measures
     st.divider()
     _c1, _c2, _c3, _c4, _c5 = st.columns(5)
-    _c1.metric(texts['analysis_current_return'], f"{analysis['yield_pct']:+.1f}%")
-    _c2.metric(texts['analysis_breakeven'], fmt_reg(analysis['breakeven']))
-    _c3.metric(texts['analysis_trailing_stop'], fmt_reg(analysis['trailing_stop']))
-    _c4.metric(texts['analysis_yoc_label'], f"{analysis.get('yield_on_cost', 0.0):.1f}%")
-    _c5.metric(texts['analysis_weight_label'], f"{analysis.get('current_weight', 0.0):.1f}%")
+    _c1.metric(texts['analysis_current_return'], f"{analysis['yield_pct']:+.1f}%",
+               help=texts['metric_help_yield_pct'])
+    _c2.metric(texts['analysis_breakeven'], fmt_reg(analysis['breakeven']),
+               help=texts['metric_help_breakeven'])
+    _c3.metric(texts['analysis_trailing_stop'], fmt_reg(analysis['trailing_stop']),
+               help=texts['metric_help_trailing_stop'])
+    _c4.metric(texts['analysis_yoc_label'], f"{_yoc:.1f}%",
+               help=texts['metric_help_yoc'])
+    _c5.metric(texts['analysis_weight_label'], f"{analysis.get('current_weight', 0.0):.1f}%",
+               help=texts['metric_help_weight'])
 
     # math of recovery section
     if analysis['targets'] or analysis['dca']:
@@ -59,7 +87,7 @@ def _show_analysis_modal(ticker, analysis, fmt_reg, texts):
     if analysis['targets']:
         for _tgt in analysis['targets']:
             _lbl = texts.get(f'analysis_{_tgt["label"]}', _tgt['label'])
-            st.write(f"• {_lbl} — {fmt_reg(_tgt['price'])} ({int(_tgt['qty_to_sell'])} units)")
+            st.write(f"• {_lbl} — {_mdfmt(_tgt['price'])} ({int(_tgt['qty_to_sell'])} unidades)")
     elif analysis['scenario'] in ('gain', 'flat'):
         st.write(texts['analysis_no_targets'])
 
@@ -79,8 +107,7 @@ def _show_analysis_modal(ticker, analysis, fmt_reg, texts):
     elif analysis['scenario'] == 'loss':
         st.write(texts['analysis_no_dca'])
 
-    # risk warnings — rendered as structured blocks, not inline string interpolation
-    # (fmt_reg produces "R$ x,xx"; embedding that in markdown triggers LaTeX rendering)
+    # risk warnings — values shown as metrics; _mdfmt used only in the text template
     _has_warnings = (
         analysis.get('price_below_stop')
         or analysis['yield_pct'] < -30
@@ -95,52 +122,42 @@ def _show_analysis_modal(ticker, analysis, fmt_reg, texts):
         _rc1.metric(texts['analysis_current_return'], fmt_reg(analysis.get('current_price', 0)),
                     delta=f"{analysis['yield_pct']:+.1f}%", delta_color="inverse")
         _rc2.metric(texts['analysis_trailing_stop'], fmt_reg(analysis['trailing_stop']))
-        st.warning("🚨 " + texts['risk_exit_alert'].split('{')[0].strip())
+        st.warning(texts['risk_exit_alert'].format(
+            price=_mdfmt(analysis.get('current_price', 0)),
+            stop=_mdfmt(analysis['trailing_stop']),
+        ))
 
     if analysis['yield_pct'] < -30:
         st.warning(texts['risk_sunk_cost'])
 
     if analysis['dca'] and all(_d.get('concentration_risk') for _d in analysis['dca']):
         _worst = max(_d.get('new_weight', 0.0) for _d in analysis['dca'])
-        _rc1, _rc2 = st.columns(2)
-        _rc1.metric(texts['analysis_post_dca_weight'], f"{_worst:.1f}%", delta="limit: 10%", delta_color="inverse")
-        st.warning("⚠️ " + texts['risk_concentration'].split('{')[0].strip())
+        _wc1, _wc2 = st.columns(2)
+        _wc1.metric(texts['analysis_post_dca_weight'], f"{_worst:.1f}%",
+                    delta="limite: 10%", delta_color="inverse")
+        st.warning(texts['risk_concentration'].format(weight=_worst))
 
-
-    # actionable next step — keep currency values out of markdown text
-    _yoc = analysis.get('yield_on_cost', 0.0)
-    _stop_val = analysis['trailing_stop']
+    # actionable next step — full sentences, currency via _mdfmt to avoid LaTeX mangling
     if rec == 'exit':
-        _action = texts['action_exit'].split('{')[0].strip().rstrip('or').strip()
-        _action_extra = fmt_reg(_stop_val)
+        _action = texts['action_exit'].format(stop=_mdfmt(analysis['trailing_stop']))
     elif rec == 'trim':
         _action = texts['action_trim']
-        _action_extra = None
     elif rec == 'hold' and _yoc >= 8.0 and analysis['scenario'] == 'loss':
         _action = texts['action_hold_dividend'].format(yoc=_yoc)
-        _action_extra = None
     elif rec == 'dca' and analysis['dca'] and all(_d.get('concentration_risk') for _d in analysis['dca']):
         _action = texts['action_dca_blocked']
-        _action_extra = None
     elif rec == 'dca' and analysis['dca']:
         _best = next((_d for _d in analysis['dca'] if not _d.get('concentration_risk')), analysis['dca'][0])
-        # split capital and new_avg into metrics; strip the template placeholders from the label
-        _action = texts['action_dca'].split('{')[0].strip()
-        _action_extra = None
+        _action = texts['action_dca'].format(
+            capital=_mdfmt(_best['add_qty'] * _best['add_price']),
+            new_avg=_mdfmt(_best['new_avg']),
+        )
     else:
         _action = texts['action_hold']
-        _action_extra = None
 
     st.divider()
     st.markdown(f"##### {texts['analysis_action_title']}")
     st.success(f"➡️ {_action}")
-    if rec == 'exit' and _action_extra:
-        st.metric(texts['analysis_trailing_stop'], _action_extra)
-    if rec == 'dca' and analysis['dca']:
-        _best = next((_d for _d in analysis['dca'] if not _d.get('concentration_risk')), analysis['dca'][0])
-        _ac1, _ac2 = st.columns(2)
-        _ac1.metric(texts['analysis_dca_new_total'], fmt_reg(_best['add_qty'] * _best['add_price']))
-        _ac2.metric(texts['analysis_dca_new_avg'], fmt_reg(_best['new_avg']))
 
 
 @st.fragment
