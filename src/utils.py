@@ -41,7 +41,7 @@ def get_exchange_rate(base_currency: str = "USD"):
     fallback = {"USD": 5.45, "EUR": 5.90}.get(base, 5.45)
     try:
         fx_ticker = f"{base}BRL=X"
-        data = yf.download(fx_ticker, period="1d", progress=False, auto_adjust=True)
+        data = yf.download(fx_ticker, period="5d", progress=False, auto_adjust=True)
         return float(data["Close"].dropna().iloc[-1].item())
     except Exception:
         logger.exception("Failed to fetch %s/BRL from yfinance. Using fallback.", base)
@@ -313,6 +313,10 @@ def calculate_portfolio(df):
 def fetch_market_prices(tickers):
     """Fetch latest prices for B3 tickers via yfinance (.SA suffix).
 
+    Uses period='1mo' so that prices remain available through multi-day
+    holiday periods (e.g. Easter week). dropna().iloc[-1] always picks
+    the most recent trading day.
+
     Returns a dict: {ticker: {"p": float|None, "live": bool}}
     """
     if not tickers:
@@ -320,7 +324,7 @@ def fetch_market_prices(tickers):
     prices = {t: {"p": None, "live": False} for t in tickers}
     try:
         sa_tickers = [f"{t}.SA" for t in tickers]
-        data = yf.download(sa_tickers, period="1d", progress=False, group_by="ticker", auto_adjust=True)
+        data = yf.download(sa_tickers, period="1mo", progress=False, group_by="ticker", auto_adjust=True)
         for t in tickers:
             try:
                 s = f"{t}.SA"
