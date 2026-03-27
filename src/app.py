@@ -163,6 +163,9 @@ with st.sidebar.expander(texts['sidebar_market'], expanded=False):
         help=texts['brapi_token_help'],
     )
 
+    if not st.session_state.brapi_token:
+        st.warning(texts['brapi_token_missing_warning'])
+
     rate = utils.get_exchange_rate(fx_base, token=st.session_state.brapi_token)
     st.metric(label=texts['fx_rate_msg'].format(base=fx_base), value=f"R$ {rate:.2f}")
 

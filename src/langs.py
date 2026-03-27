@@ -27,6 +27,7 @@ LANGUAGES = {
         'clear_data_button': '🗑️ Clear session data',
         'brapi_token_label': 'brapi.dev API token',
         'brapi_token_help': 'Optional. Get a free token at brapi.dev to enable live prices and FX rates.',
+        'brapi_token_missing_warning': 'No brapi token set — all prices will fall back to average cost. Get a free token at brapi.dev/dashboard.',
         'yahoo_unavailable_warning': (
             'Live prices unavailable for {missing}/{total} tickers. Using average cost as fallback.'
         ),
@@ -119,6 +120,7 @@ LANGUAGES = {
         'clear_data_button': '🗑️ Limpar dados da sessão',
         'brapi_token_label': 'Token da API brapi.dev',
         'brapi_token_help': 'Opcional. Obtenha um token gratuito em brapi.dev para cotações e câmbio em tempo real.',
+        'brapi_token_missing_warning': 'Token brapi não configurado — todas as cotações usarão o preço médio como fallback. Obtenha um token gratuito em brapi.dev/dashboard.',
         'yahoo_unavailable_warning': (
             'Cotações indisponíveis para {missing}/{total} tickers. Usando preço médio como fallback.'
         ),
@@ -211,6 +213,7 @@ LANGUAGES = {
         'clear_data_button': '🗑️ Limpiar datos de la sesión',
         'brapi_token_label': 'Token de API brapi.dev',
         'brapi_token_help': 'Opcional. Obtenga un token gratuito en brapi.dev para cotizaciones y tipo de cambio en vivo.',
+        'brapi_token_missing_warning': 'Token brapi no configurado — todas las cotizaciones usarán el costo promedio como alternativa. Obtenga un token gratuito en brapi.dev/dashboard.',
         'yahoo_unavailable_warning': (
             'Cotizaciones no disponibles para {missing}/{total} tickers. Usando costo promedio como alternativa.'
         ),
@@ -303,6 +306,7 @@ LANGUAGES = {
         'clear_data_button': '🗑️ Effacer les données de session',
         'brapi_token_label': 'Jeton API brapi.dev',
         'brapi_token_help': 'Optionnel. Obtenez un jeton gratuit sur brapi.dev pour les cours et taux de change en direct.',
+        'brapi_token_missing_warning': 'Jeton brapi non configuré — tous les cours utiliseront le coût moyen. Obtenez un jeton gratuit sur brapi.dev/dashboard.',
         'yahoo_unavailable_warning': (
             'Cours indisponibles pour {missing}/{total} tickers. Utilisation du coût moyen comme solution.'
         ),
