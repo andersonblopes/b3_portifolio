@@ -33,9 +33,16 @@ warnings.filterwarnings(
 # some FIIs and stocks change their B3 ticker code over time (renaming, fund mergers, etc.)
 # keys are the codes that appear in old B3 exports; values are the current active codes on Yahoo Finance.
 TICKER_REMAP = {
+    "BRIT3": "BRST3",   # Brisanet renamed to Brisanet Serviços
     "CVBI11": "PCIP11",  # renamed 24/09/2025
     "MALL11": "PMLL11",  # renamed 22/07/2025
     "RVBI11": "PSEC11",  # renamed 24/10/2025
+}
+
+# tickers that have been delisted or wound down with no successor and no tradeable value.
+# positions in these are excluded from portfolio calculations to avoid distorting totals.
+DISCONTINUED_TICKERS = {
+    "LSPA11",  # Leste Riva Equity - fund in wind-down, last trade Dec 2024
 }
 
 
@@ -272,6 +279,9 @@ def calculate_portfolio(df):
     summary = []
 
     for ticker, data in df.groupby('ticker'):
+        if ticker in DISCONTINUED_TICKERS:
+            logger.debug("Skipping discontinued ticker %s.", ticker)
+            continue
         data = data.sort_values('date')
         qty, cost, earnings = 0.0, 0.0, 0.0
 

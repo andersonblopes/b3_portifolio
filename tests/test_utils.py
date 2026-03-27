@@ -170,6 +170,26 @@ def test_calculate_portfolio_clamps_sell_bigger_than_position():
     assert out.empty
 
 
+def test_calculate_portfolio_skips_discontinued_tickers():
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2024-01-01", "2024-01-01"]),
+            "ticker": ["LSPA11", "PETR4"],
+            "type": ["BUY", "BUY"],
+            "qty": [100, 10],
+            "val": [5000.0, 100.0],
+        }
+    )
+
+    out = utils.calculate_portfolio(df)
+    # LSPA11 is in DISCONTINUED_TICKERS; only PETR4 should appear
+    assert list(out["ticker"]) == ["PETR4"]
+
+
+def test_ticker_remap_maps_brit3_to_brst3():
+    assert utils.TICKER_REMAP["BRIT3"] == "BRST3"
+
+
 def test_get_exchange_rate_uses_yfinance_response(monkeypatch):
     import pandas as pd
 
