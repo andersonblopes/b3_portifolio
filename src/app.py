@@ -8,6 +8,44 @@ from langs import LANGUAGES
 
 st.set_page_config(page_title="B3 Master", layout="wide", page_icon="📈")
 
+
+@st.dialog("📊 Analysis", width="large")
+def _show_analysis_modal(ticker, analysis, fmt_reg, texts):
+    """Render the position analysis modal dialog."""
+    if analysis is None:
+        st.warning(texts['analysis_no_data'])
+        return
+    _scen = texts.get(f'analysis_scenario_{analysis["scenario"]}', analysis['scenario'])
+    st.markdown(f"**{texts['analysis_title']}: {ticker}** — {_scen}")
+    st.divider()
+    _c1, _c2, _c3 = st.columns(3)
+    _c1.metric(texts['analysis_current_return'], f"{analysis['yield_pct']:+.1f}%")
+    _c2.metric(texts['analysis_breakeven'], fmt_reg(analysis['breakeven']))
+    _c3.metric(texts['analysis_trailing_stop'], fmt_reg(analysis['trailing_stop']))
+    st.divider()
+    if analysis['targets']:
+        st.markdown(f"**{texts['analysis_targets_title']}**")
+        for _tgt in analysis['targets']:
+            _lbl = texts.get(f'analysis_{_tgt["label"]}', _tgt['label'])
+            st.write(f"• {_lbl} — {fmt_reg(_tgt['price'])} ({int(_tgt['qty_to_sell'])} units)")
+    elif analysis['scenario'] in ('gain', 'flat'):
+        st.write(texts['analysis_no_targets'])
+    if analysis['dca']:
+        st.markdown(f"**{texts['analysis_dca_title']}**")
+        for _d in analysis['dca']:
+            _lbl = texts.get(f'analysis_{_d["label"]}', _d['label'])
+            _add_cap = round(_d['add_qty'] * _d['add_price'], 2)
+            _c_a, _c_b, _c_c, _c_d = st.columns(4)
+            _c_a.metric(texts['analysis_dca_add_qty'], int(_d['add_qty']))
+            _c_b.metric(texts['analysis_dca_at_price'], fmt_reg(_d['add_price']))
+            _c_c.metric(texts['analysis_dca_new_avg'], fmt_reg(_d['new_avg']))
+            _c_d.metric(texts['analysis_dca_new_total'], fmt_reg(_add_cap))
+            st.caption(f"— {_lbl}")
+    elif analysis['scenario'] == 'loss':
+        st.write(texts['analysis_no_dca'])
+    for _note in analysis['notes']:
+        st.info(texts.get(f'analysis_{_note}', _note))
+
 # Initialization of Session State
 if 'raw_df' not in st.session_state:
     st.session_state.raw_df = None
@@ -352,99 +390,38 @@ if st.session_state.raw_df is not None:
         for t in types:
             sub_df = portfolio_main[portfolio_main['asset_type'] == t].copy()
             # Sort by yield ("Red.." / "Yield") descending
-            sub_df = sub_df.sort_values('yield', ascending=False)
+            sub_df = sub_df.sort_values('yield', ascending=False).reset_index(drop=True)
             t_mkt = sub_df['v_mercado'].sum()
             weight = (t_mkt / mkt_total) * 100 if mkt_total > 0 else 0
             label_assets = texts['assets_count']
             title = f"📁 {t} | {len(sub_df)} {label_assets} | {fmt_reg(t_mkt)} ({weight:.2f}%)"
             with st.expander(title, expanded=True):
-                tables.render_portfolio_table(sub_df, texts, fmt_reg)
-                # per-asset analysis picker — shown below the group table
-                _sel_key = f"analysis_sel_{t}"
-                _selected = st.selectbox(
-                    texts['analysis_select_label'],
-                    options=sub_df['ticker'].tolist(),
-                    index=None,
-                    placeholder=texts['analysis_select_placeholder'],
-                    key=_sel_key,
-                    label_visibility='collapsed',
+                _tbl_key = f"tbl_{t}"
+                _prev_key = f"_analysis_prev_{t}"
+                event = tables.render_portfolio_table(
+                    sub_df, texts, fmt_reg, selectable=True, table_key=_tbl_key
                 )
-                if _selected:
-                    _has_live = prices.get(_selected, {}).get('p') is not None
-                    if not _has_live:
-                        st.warning(texts['analysis_no_data'])
-                    else:
-                        _row = sub_df[sub_df['ticker'] == _selected].iloc[0]
-                        _an = utils.analyze_position(
-                            ticker=_selected,
-                            qty=float(_row['qty']),
-                            avg_price=float(_row['avg_price']),
-                            total_cost=float(_row['total_cost']),
-                            current_price=float(_row['p_atual']),
-                            earnings=float(_row['earnings']),
-                            asset_type=str(_row['asset_type']),
-                        )
-                        if _an:
-                            with st.container(border=True):
-                                _scen = texts.get(
-                                    f'analysis_scenario_{_an["scenario"]}',
-                                    _an['scenario'],
-                                )
-                                st.markdown(
-                                    f"**{texts['analysis_title']}: {_selected}** — {_scen}"
-                                )
-                                _c1, _c2, _c3 = st.columns(3)
-                                _c1.metric(
-                                    texts['analysis_current_return'],
-                                    f"{_an['yield_pct']:+.1f}%",
-                                )
-                                _c2.metric(
-                                    texts['analysis_breakeven'],
-                                    fmt_reg(_an['breakeven']),
-                                )
-                                _c3.metric(
-                                    texts['analysis_trailing_stop'],
-                                    fmt_reg(_an['trailing_stop']),
-                                )
-                                if _an['targets']:
-                                    st.markdown(f"**{texts['analysis_targets_title']}**")
-                                    for _tgt in _an['targets']:
-                                        _lbl = texts.get(
-                                            f'analysis_{_tgt["label"]}',
-                                            _tgt['label'],
-                                        )
-                                        st.write(
-                                            f"• {_lbl} "
-                                            f"— {fmt_reg(_tgt['price'])}"
-                                            f" ({int(_tgt['qty_to_sell'])} units)"
-                                        )
-                                elif _an['scenario'] in ('gain', 'flat'):
-                                    st.write(texts['analysis_no_targets'])
-                                if _an['dca']:
-                                    st.markdown(f"**{texts['analysis_dca_title']}**")
-                                    for _d in _an['dca']:
-                                        _lbl = texts.get(
-                                            f'analysis_{_d["label"]}',
-                                            _d['label'],
-                                        )
-                                        _add_cap = round(
-                                            _d['add_qty'] * _d['add_price'], 2
-                                        )
-                                        st.write(
-                                            f"• {_lbl}: "
-                                            f"{texts['analysis_dca_add_qty']} "
-                                            f"{int(_d['add_qty'])} "
-                                            f"| {texts['analysis_dca_at_price']} "
-                                            f"{fmt_reg(_d['add_price'])} "
-                                            f"| {texts['analysis_dca_new_avg']} "
-                                            f"{fmt_reg(_d['new_avg'])} "
-                                            f"| {texts['analysis_dca_new_total']} "
-                                            f"{fmt_reg(_add_cap)}"
-                                        )
-                                elif _an['scenario'] == 'loss':
-                                    st.write(texts['analysis_no_dca'])
-                                for _note in _an['notes']:
-                                    st.info(texts.get(f'analysis_{_note}', _note))
+                if event and event.selection.rows:
+                    _idx = event.selection.rows[0]
+                    _ticker = sub_df.iloc[_idx]['ticker']
+                    # only open modal on a new selection; prevents reopening after dismiss
+                    if st.session_state.get(_prev_key) != _ticker:
+                        st.session_state[_prev_key] = _ticker
+                        _row = sub_df.iloc[_idx]
+                        _has_live = prices.get(_ticker, {}).get('p') is not None
+                        if _has_live:
+                            _an = utils.analyze_position(
+                                ticker=_ticker,
+                                qty=float(_row['qty']),
+                                avg_price=float(_row['avg_price']),
+                                total_cost=float(_row['total_cost']),
+                                current_price=float(_row['p_atual']),
+                                earnings=float(_row['earnings']),
+                                asset_type=str(_row['asset_type']),
+                            )
+                        else:
+                            _an = None
+                        _show_analysis_modal(_ticker, _an, fmt_reg, texts)
 
     if has_earnings:
         with tabs[earnings_tab_idx]:  # Earnings
