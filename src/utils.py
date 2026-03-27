@@ -448,22 +448,34 @@ def fetch_market_prices(tickers):
     return prices
 
 
-def analyze_position(ticker, qty, avg_price, total_cost, current_price, earnings, asset_type):
-    """Return a structured position analysis with actionable recommendations.
+def analyze_position(
+    ticker, qty, avg_price, total_cost, current_price, earnings, asset_type,
+    portfolio_total_value=0.0,
+):
+    """Return a structured position analysis with an actionable recommendation.
 
-    Strategies applied:
-    - Gain scenario: trailing stop, partial-profit targets, DCA top-up sizing
-    - Loss scenario: DCA to reduce average, break-even study, max safe add-on
+    Recommendation logic (priority order):
+    - EXIT  : price below trailing stop AND yield-on-cost < 8%
+    - HOLD  : price below stop BUT yield-on-cost >= 8% (dividend strategy override)
+    - TRIM  : gain >= 50% — consider locking in partial profits
+    - HOLD  : gain or flat with no special signals
+    - HOLD  : loss but yield-on-cost >= 8% (dividend cushion)
+    - DCA   : loss, at least one DCA option stays under 10% portfolio weight
+    - HOLD  : loss but all DCA options blocked by concentration risk
 
     Returns a dict with keys:
-        scenario       : 'gain' | 'loss' | 'flat'
-        yield_pct      : float  (unrealised return %)
-        breakeven      : float  (price needed to recover total cost incl. earnings)
-        trailing_stop  : float
-        targets        : list of {'label': str, 'price': float, 'qty_to_sell': float}
-        dca            : list of {'label': str, 'add_qty': float, 'add_price': float,
-                                  'new_avg': float, 'new_total': float} | None
-        notes          : list of str (contextual observations)
+        scenario            : 'gain' | 'loss' | 'flat'
+        recommendation      : 'exit' | 'trim' | 'hold' | 'dca'
+        yield_pct           : float  (unrealised return %)
+        yield_on_cost       : float  (earnings / total_cost %)
+        breakeven           : float  (effective price to recover cost after earnings)
+        current_weight      : float  (asset mkt value as % of portfolio_total_value)
+        trailing_stop       : float
+        price_below_stop    : bool
+        targets             : list of dicts — label, price, qty_to_sell
+        dca                 : list of dicts — label, add_qty, add_price, new_avg,
+                              new_total, concentration_risk, new_weight
+        notes               : list of str keys
     """
     if current_price <= 0 or qty <= 0:
         return None
@@ -471,90 +483,100 @@ def analyze_position(ticker, qty, avg_price, total_cost, current_price, earnings
     yield_pct = (current_price - avg_price) / avg_price * 100
     market_value = current_price * qty
 
-    # effective breakeven accounting for earnings already received
+    # effective breakeven: how far dividends have already reduced the real cost
     effective_cost = max(total_cost - earnings, 0)
     breakeven_price = effective_cost / qty if qty > 0 else avg_price
+
+    yield_on_cost = earnings / total_cost * 100 if total_cost > 0 else 0.0
+    current_weight = market_value / portfolio_total_value * 100 if portfolio_total_value > 0 else 0.0
 
     notes = []
     targets = []
     dca = None
 
     # trailing stop levels: tighter for FIIs (less volatile), wider for stocks
-    # rule: protect at least the cost basis; floor at avg_price
+    # floor at breakeven — never allow a stop that guarantees a loss vs effective cost
     if asset_type in ('FII/ETF',):
-        trail_pct = 0.08  # 8% trail for FIIs
+        trail_pct = 0.08
     elif asset_type == 'BDR':
-        trail_pct = 0.12  # 12% for BDRs (FX exposure)
+        trail_pct = 0.12
     else:
-        trail_pct = 0.15  # 15% for stocks
+        trail_pct = 0.15
 
     trailing_stop = max(current_price * (1 - trail_pct), breakeven_price)
+    price_below_stop = current_price < trailing_stop
+
+    def _concentration(add_qty):
+        """Return (concentration_risk: bool, new_weight: float) after buying add_qty shares."""
+        if portfolio_total_value <= 0:
+            return False, 0.0
+        new_mkt = current_price * (qty + add_qty)
+        new_portfolio = portfolio_total_value + add_qty * current_price
+        w = new_mkt / new_portfolio * 100 if new_portfolio > 0 else 0.0
+        return w > 10.0, round(w, 1)
 
     if yield_pct >= 0:
         scenario = 'gain' if yield_pct > 0.5 else 'flat'
 
-        # partial profit targets — classic pyramid scale-out
+        # pyramid scale-out targets
         target_levels = [
-            ('target_20pct',    avg_price * 1.20, 0.25),   # sell 25% at +20%
-            ('target_50pct',    avg_price * 1.50, 0.33),   # sell 33% at +50%
-            ('target_double',   avg_price * 2.00, 0.50),   # sell 50% at 2×
+            ('target_20pct',  avg_price * 1.20, 0.25),
+            ('target_50pct',  avg_price * 1.50, 0.33),
+            ('target_double', avg_price * 2.00, 0.50),
         ]
         for label, price, frac in target_levels:
-            if price >= current_price:  # only show future targets
-                targets.append({
-                    'label': label,
-                    'price': round(price, 2),
-                    'qty_to_sell': round(qty * frac, 0),
-                })
+            if price >= current_price:
+                targets.append({'label': label, 'price': round(price, 2), 'qty_to_sell': round(qty * frac, 0)})
 
-        # if already above +20%, suggest a top-up only if still below a base target
+        # DCA top-up only when still far from first target (<20% gain)
         if yield_pct < 20:
-            # room to add: buy up to 50% more at current to keep avg cost reasonable
             add_qty = round(qty * 0.50, 0)
             new_qty = qty + add_qty
             new_avg = (total_cost + add_qty * current_price) / new_qty
+            conc, nw = _concentration(add_qty)
             dca = [{
                 'label': 'dca_topup',
                 'add_qty': add_qty,
                 'add_price': current_price,
                 'new_avg': round(new_avg, 2),
                 'new_total': round(total_cost + add_qty * current_price, 2),
+                'concentration_risk': conc,
+                'new_weight': nw,
             }]
 
         if yield_pct > 50:
             notes.append('note_high_gain')
-        if earnings / total_cost >= 0.05 if total_cost > 0 else False:
+        if total_cost > 0 and earnings / total_cost >= 0.05:
             notes.append('note_earnings_offset')
 
     else:
         scenario = 'loss'
 
-        # DCA strategy: calculate how many shares to buy at each price level
-        # to move the average cost to a meaningful target
+        # only suggest DCA when loss < 30%; beyond that the sunk-cost check applies
         dca_levels = [
-            # target: midpoint between current price and original avg (50% recovery)
             ('dca_50pct_recovery', (avg_price + current_price) / 2),
-            # target: 5% above current price (minimal viable recovery target)
             ('dca_5pct_above',     current_price * 1.05),
         ]
         dca = []
         for label, target_avg in dca_levels:
-            # add_qty = (total_cost - target_avg * qty) / (target_avg - current_price)
-            # valid only when target_avg > current_price
+            # formula valid only when target_avg is strictly between current and avg
             if target_avg <= current_price or target_avg >= avg_price:
                 continue
-            add_qty = (total_cost - target_avg * qty) / (target_avg - current_price)
-            if add_qty <= 0:
+            add_qty_raw = (total_cost - target_avg * qty) / (target_avg - current_price)
+            if add_qty_raw <= 0:
                 continue
-            add_qty = round(add_qty, 0)
+            add_qty = round(add_qty_raw, 0)
             new_qty = qty + add_qty
             new_avg = (total_cost + add_qty * current_price) / new_qty
+            conc, nw = _concentration(add_qty)
             dca.append({
                 'label': label,
                 'add_qty': add_qty,
                 'add_price': current_price,
                 'new_avg': round(new_avg, 2),
                 'new_total': round(total_cost + add_qty * current_price, 2),
+                'concentration_risk': conc,
+                'new_weight': nw,
             })
 
         if abs(yield_pct) > 30:
@@ -562,11 +584,32 @@ def analyze_position(ticker, qty, avg_price, total_cost, current_price, earnings
         if earnings > 0:
             notes.append('note_earnings_offset')
 
+    # recommendation — priority order matters
+    if price_below_stop and yield_on_cost >= 8.0:
+        recommendation = 'hold'   # dividend income offsets the stop signal
+    elif price_below_stop:
+        recommendation = 'exit'
+    elif scenario == 'gain' and yield_pct >= 50:
+        recommendation = 'trim'
+    elif scenario in ('gain', 'flat'):
+        recommendation = 'hold'
+    elif yield_on_cost >= 8.0:
+        recommendation = 'hold'   # dividend cushion in loss scenario
+    elif dca and any(not d['concentration_risk'] for d in dca):
+        recommendation = 'dca'
+    else:
+        recommendation = 'hold'   # concentration blocked or no valid DCA
+
     return {
         'scenario': scenario,
+        'recommendation': recommendation,
         'yield_pct': round(yield_pct, 2),
+        'yield_on_cost': round(yield_on_cost, 2),
         'breakeven': round(breakeven_price, 2),
+        'current_weight': round(current_weight, 1),
+        'current_price': round(current_price, 2),
         'trailing_stop': round(trailing_stop, 2),
+        'price_below_stop': price_below_stop,
         'targets': targets,
         'dca': dca or [],
         'notes': notes,

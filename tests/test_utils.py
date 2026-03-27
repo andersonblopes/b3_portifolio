@@ -627,3 +627,128 @@ def test_analyze_position_dca_top_up_only_when_yield_below_20():
         asset_type="Ação",
     )
     assert result_high['dca'] == [] or result_high['dca'] is None
+
+
+# --- recommendation engine ---
+
+def test_analyze_position_has_recommendation_field():
+    result = utils.analyze_position(
+        ticker="PETR4", qty=100, avg_price=30.0, total_cost=3000.0,
+        current_price=32.0, earnings=0.0, asset_type="Ação",
+    )
+    assert 'recommendation' in result
+    assert result['recommendation'] in ('exit', 'trim', 'hold', 'dca')
+
+
+def test_analyze_position_exit_when_below_stop():
+    # price just above avg but below the trailing stop floor at breakeven
+    # avg=30, earnings=0, breakeven=30, current=25 (below stop)
+    result = utils.analyze_position(
+        ticker="PETR4", qty=100, avg_price=30.0, total_cost=3000.0,
+        current_price=25.0, earnings=0.0, asset_type="Ação",
+    )
+    assert result['price_below_stop'] is True
+    assert result['recommendation'] == 'exit'
+
+
+def test_analyze_position_hold_overrides_exit_when_high_dividend():
+    # price below stop but yield-on-cost >= 8% — dividend cushion keeps the hold
+    result = utils.analyze_position(
+        ticker="BBAS3", qty=100, avg_price=30.0, total_cost=3000.0,
+        current_price=25.0, earnings=300.0, asset_type="Ação",
+    )
+    # earnings/total_cost = 10% >= 8% → dividend override
+    assert result['yield_on_cost'] >= 8.0
+    assert result['price_below_stop'] is True
+    assert result['recommendation'] == 'hold'
+
+
+def test_analyze_position_trim_at_50pct_gain():
+    result = utils.analyze_position(
+        ticker="VALE3", qty=100, avg_price=20.0, total_cost=2000.0,
+        current_price=32.0, earnings=0.0, asset_type="Ação",
+    )
+    assert result['yield_pct'] >= 50
+    assert result['recommendation'] == 'trim'
+
+
+def test_analyze_position_hold_for_moderate_gain():
+    # +10% gain, no stop triggered — should be hold
+    result = utils.analyze_position(
+        ticker="VALE3", qty=100, avg_price=20.0, total_cost=2000.0,
+        current_price=22.0, earnings=0.0, asset_type="Ação",
+    )
+    assert result['scenario'] in ('gain', 'flat')
+    assert result['recommendation'] == 'hold'
+
+
+def test_analyze_position_dca_recommended_on_loss():
+    # 5% loss; earnings reduce breakeven below current_price so stop is not triggered;
+    # yield-on-cost is 6% (< 8%) so no dividend cushion → lands on DCA
+    result = utils.analyze_position(
+        ticker="MGLU3", qty=100, avg_price=10.0, total_cost=1000.0,
+        current_price=9.5, earnings=60.0, asset_type="Ação",
+        portfolio_total_value=500_000.0,
+    )
+    assert result['scenario'] == 'loss'
+    assert result['price_below_stop'] is False
+    assert result['yield_on_cost'] < 8.0
+    assert result['recommendation'] == 'dca'
+    assert any(not d['concentration_risk'] for d in result['dca'])
+
+
+def test_analyze_position_dca_blocked_by_concentration():
+    # same small-loss scenario but tiny portfolio forces every DCA above 10% weight
+    result = utils.analyze_position(
+        ticker="MGLU3", qty=100, avg_price=10.0, total_cost=1000.0,
+        current_price=9.5, earnings=60.0, asset_type="Ação",
+        portfolio_total_value=2000.0,   # mkt_value=950 already 47.5%; any DCA → > 10%
+    )
+    assert result['scenario'] == 'loss'
+    assert result['price_below_stop'] is False
+    assert result['dca']
+    all_blocked = all(d['concentration_risk'] for d in result['dca'])
+    assert all_blocked
+    assert result['recommendation'] == 'hold'
+
+
+def test_analyze_position_concentration_risk_flag_per_dca_entry():
+    # with a very small portfolio, any additional purchase should flag concentration
+    result = utils.analyze_position(
+        ticker="MGLU3", qty=500, avg_price=20.0, total_cost=10000.0,
+        current_price=15.0, earnings=0.0, asset_type="Ação",
+        portfolio_total_value=20_000.0,
+    )
+    for d in result['dca']:
+        assert 'concentration_risk' in d
+        assert 'new_weight' in d
+        assert isinstance(d['concentration_risk'], bool)
+        assert isinstance(d['new_weight'], float)
+
+
+def test_analyze_position_yield_on_cost_calculated():
+    result = utils.analyze_position(
+        ticker="BBSE3", qty=100, avg_price=30.0, total_cost=3000.0,
+        current_price=32.0, earnings=240.0, asset_type="Ação",
+    )
+    # 240 / 3000 * 100 = 8.0
+    assert result['yield_on_cost'] == pytest.approx(8.0)
+
+
+def test_analyze_position_current_weight_calculated():
+    result = utils.analyze_position(
+        ticker="BBSE3", qty=100, avg_price=30.0, total_cost=3000.0,
+        current_price=40.0, earnings=0.0, asset_type="Ação",
+        portfolio_total_value=40_000.0,
+    )
+    # mkt_value = 4000, portfolio = 40000 → weight = 10%
+    assert result['current_weight'] == pytest.approx(10.0)
+
+
+def test_analyze_position_current_price_in_result():
+    result = utils.analyze_position(
+        ticker="PETR4", qty=100, avg_price=30.0, total_cost=3000.0,
+        current_price=28.5, earnings=0.0, asset_type="Ação",
+    )
+    assert result['current_price'] == pytest.approx(28.5)
+

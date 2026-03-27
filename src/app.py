@@ -15,36 +15,113 @@ def _show_analysis_modal(ticker, analysis, fmt_reg, texts):
     if analysis is None:
         st.warning(texts['analysis_no_data'])
         return
+
+    rec = analysis['recommendation']
+    rec_badge = texts.get(f'rec_{rec}', rec.upper())
     _scen = texts.get(f'analysis_scenario_{analysis["scenario"]}', analysis['scenario'])
-    st.markdown(f"**{texts['analysis_title']}: {ticker}** — {_scen}")
+
+    # header: ticker/scenario on the left, recommendation badge on the right
+    _hc1, _hc2 = st.columns([3, 1])
+    _hc1.markdown(f"**{texts['analysis_title']}: {ticker}** — {_scen}")
+    _hc2.markdown(f"**{texts['analysis_rec_label']}:** {rec_badge}")
+
+    # executive summary — one sentence chosen by recommendation + context
     st.divider()
-    _c1, _c2, _c3 = st.columns(3)
+    st.markdown(f"##### {texts['analysis_exec_summary_title']}")
+    if rec == 'exit':
+        _exec_key = 'exec_exit'
+    elif rec == 'trim':
+        _exec_key = 'exec_trim'
+    elif rec == 'hold' and analysis['scenario'] in ('gain', 'flat'):
+        _exec_key = 'exec_hold_gain'
+    elif rec == 'hold' and analysis.get('yield_on_cost', 0.0) >= 8.0:
+        _exec_key = 'exec_hold_dividend'
+    elif rec == 'hold':
+        _exec_key = 'exec_hold_concentration'
+    else:
+        _exec_key = 'exec_dca'
+    st.info(texts[_exec_key])
+
+    # key metrics row
+    st.divider()
+    _c1, _c2, _c3, _c4, _c5 = st.columns(5)
     _c1.metric(texts['analysis_current_return'], f"{analysis['yield_pct']:+.1f}%")
     _c2.metric(texts['analysis_breakeven'], fmt_reg(analysis['breakeven']))
     _c3.metric(texts['analysis_trailing_stop'], fmt_reg(analysis['trailing_stop']))
-    st.divider()
+    _c4.metric(texts['analysis_yoc_label'], f"{analysis.get('yield_on_cost', 0.0):.1f}%")
+    _c5.metric(texts['analysis_weight_label'], f"{analysis.get('current_weight', 0.0):.1f}%")
+
+    # math of recovery section
+    if analysis['targets'] or analysis['dca']:
+        st.divider()
+        st.markdown(f"##### {texts['analysis_math_title']}")
+
     if analysis['targets']:
-        st.markdown(f"**{texts['analysis_targets_title']}**")
         for _tgt in analysis['targets']:
             _lbl = texts.get(f'analysis_{_tgt["label"]}', _tgt['label'])
             st.write(f"• {_lbl} — {fmt_reg(_tgt['price'])} ({int(_tgt['qty_to_sell'])} units)")
     elif analysis['scenario'] in ('gain', 'flat'):
         st.write(texts['analysis_no_targets'])
+
     if analysis['dca']:
-        st.markdown(f"**{texts['analysis_dca_title']}**")
         for _d in analysis['dca']:
             _lbl = texts.get(f'analysis_{_d["label"]}', _d['label'])
-            _add_cap = round(_d['add_qty'] * _d['add_price'], 2)
-            _c_a, _c_b, _c_c, _c_d = st.columns(4)
-            _c_a.metric(texts['analysis_dca_add_qty'], int(_d['add_qty']))
-            _c_b.metric(texts['analysis_dca_at_price'], fmt_reg(_d['add_price']))
-            _c_c.metric(texts['analysis_dca_new_avg'], fmt_reg(_d['new_avg']))
-            _c_d.metric(texts['analysis_dca_new_total'], fmt_reg(_add_cap))
+            _add_cap = _d['add_qty'] * _d['add_price']
+            _ca, _cb, _cc, _cd, _ce = st.columns(5)
+            _ca.metric(texts['analysis_dca_add_qty'], int(_d['add_qty']))
+            _cb.metric(texts['analysis_dca_at_price'], fmt_reg(_d['add_price']))
+            _cc.metric(texts['analysis_dca_new_avg'], fmt_reg(_d['new_avg']))
+            _cd.metric(texts['analysis_dca_new_total'], fmt_reg(_add_cap))
+            _ce.metric(texts['analysis_post_dca_weight'], f"{_d.get('new_weight', 0.0):.1f}%")
+            if _d.get('concentration_risk'):
+                st.warning(texts['risk_concentration'].format(weight=_d.get('new_weight', 0.0)))
             st.caption(f"— {_lbl}")
     elif analysis['scenario'] == 'loss':
         st.write(texts['analysis_no_dca'])
-    for _note in analysis['notes']:
-        st.info(texts.get(f'analysis_{_note}', _note))
+
+    # risk warnings
+    _warnings = []
+    if analysis.get('price_below_stop'):
+        _warnings.append(texts['risk_exit_alert'].format(
+            price=fmt_reg(analysis.get('current_price', 0)),
+            stop=fmt_reg(analysis['trailing_stop']),
+        ))
+    if analysis['yield_pct'] < -30:
+        _warnings.append(texts['risk_sunk_cost'])
+    # concentration warning at section level only when every DCA scenario is blocked
+    if analysis['dca'] and all(_d.get('concentration_risk') for _d in analysis['dca']):
+        _worst = max(_d.get('new_weight', 0.0) for _d in analysis['dca'])
+        _warnings.append(texts['risk_concentration'].format(weight=_worst))
+
+    if _warnings:
+        st.divider()
+        st.markdown(f"##### {texts['analysis_risk_section_title']}")
+        for _w in _warnings:
+            st.warning(_w)
+
+    # actionable next step
+    _yoc = analysis.get('yield_on_cost', 0.0)
+    _stop_fmt = fmt_reg(analysis['trailing_stop'])
+    if rec == 'exit':
+        _action = texts['action_exit'].format(stop=_stop_fmt)
+    elif rec == 'trim':
+        _action = texts['action_trim']
+    elif rec == 'hold' and _yoc >= 8.0 and analysis['scenario'] == 'loss':
+        _action = texts['action_hold_dividend'].format(yoc=_yoc)
+    elif rec == 'dca' and analysis['dca'] and all(_d.get('concentration_risk') for _d in analysis['dca']):
+        _action = texts['action_dca_blocked']
+    elif rec == 'dca' and analysis['dca']:
+        _best = next((_d for _d in analysis['dca'] if not _d.get('concentration_risk')), analysis['dca'][0])
+        _action = texts['action_dca'].format(
+            capital=fmt_reg(_best['add_qty'] * _best['add_price']),
+            new_avg=fmt_reg(_best['new_avg']),
+        )
+    else:
+        _action = texts['action_hold']
+
+    st.divider()
+    st.markdown(f"##### {texts['analysis_action_title']}")
+    st.success(f"➡️ {_action}")
 
 
 @st.fragment
@@ -83,7 +160,7 @@ def _data_lab_groups():
                     _row = sub_df.iloc[_idx]
                     _has_live = _prices.get(_ticker, {}).get('p') is not None
                     if _has_live:
-                        _an = utils.analyze_position(
+                    _an = utils.analyze_position(
                             ticker=_ticker,
                             qty=float(_row['qty']),
                             avg_price=float(_row['avg_price']),
@@ -91,6 +168,7 @@ def _data_lab_groups():
                             current_price=float(_row['p_atual']),
                             earnings=float(_row['earnings']),
                             asset_type=str(_row['asset_type']),
+                            portfolio_total_value=float(_mkt_total),
                         )
                     else:
                         _an = None
