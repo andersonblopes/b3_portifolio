@@ -270,11 +270,13 @@ if st.session_state.raw_df is not None:
         tab_labels.append(f"💰 {texts['tab_earnings']}")
     if show_audit:
         tab_labels.append(f"🧾 {texts['tab_audit']}")
+    tab_labels.append(f"🔄 {texts['tab_ticker_changes']}")
 
     tabs = st.tabs(tab_labels)
 
     earnings_tab_idx = 2 if has_earnings else None
     audit_tab_idx = (3 if has_earnings else 2) if show_audit else None
+    ticker_changes_tab_idx = len(tab_labels) - 1
 
     with tabs[0]:  # Dashboard Global
         c1, c2 = st.columns(2)
@@ -524,6 +526,35 @@ div[data-testid="stHorizontalBlock"] { row-gap: 0.15rem; column-gap: 0.15rem; }
             st.divider()
             st.subheader(texts['audit_ignored'])
             render_paged_df(ignored_df, ['date', 'ticker', 'inst', 'val', 'desc', 'source'], key_prefix="audit_ignored")
+
+    with tabs[ticker_changes_tab_idx]:
+        st.subheader(texts['ticker_changes_remap_title'])
+        st.caption(texts['ticker_changes_remap_desc'])
+
+        remap_rows = [
+            {
+                texts['ticker_changes_remap_col_old']: old,
+                texts['ticker_changes_remap_col_new']: meta["new"],
+                texts['ticker_changes_remap_col_note']: meta["note"],
+            }
+            for old, meta in utils.TICKER_REMAP.items()
+        ]
+        st.dataframe(pd.DataFrame(remap_rows), use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        st.subheader(texts['ticker_changes_discontinued_title'])
+        st.caption(texts['ticker_changes_discontinued_desc'])
+
+        disc_rows = [
+            {
+                texts['ticker_changes_discontinued_col_ticker']: ticker,
+                texts['ticker_changes_discontinued_col_reason']: reason,
+            }
+            for ticker, reason in utils.DISCONTINUED_TICKERS.items()
+        ]
+        st.dataframe(pd.DataFrame(disc_rows), use_container_width=True, hide_index=True)
+
 else:
     st.title(texts['welcome_title'])
     st.subheader(texts['welcome_subheader'])

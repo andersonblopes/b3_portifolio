@@ -30,19 +30,22 @@ warnings.filterwarnings(
     message=r".*Workbook contains no default style.*",
 )
 
-# some FIIs and stocks change their B3 ticker code over time (renaming, fund mergers, etc.)
-# keys are the codes that appear in old B3 exports; values are the current active codes on Yahoo Finance.
-TICKER_REMAP = {
-    "BRIT3": "BRST3",   # Brisanet renamed to Brisanet Serviços
-    "CVBI11": "PCIP11",  # renamed 24/09/2025
-    "MALL11": "PMLL11",  # renamed 22/07/2025
-    "RVBI11": "PSEC11",  # renamed 24/10/2025
+# some FIIs and stocks change their B3 ticker code over time (renaming, fund mergers, etc.).
+# each entry maps the old code (as it appears in B3 exports) to a dict with:
+#   "new"  — the current active ticker on Yahoo Finance
+#   "note" — human-readable explanation shown in the Ticker Changes tab
+TICKER_REMAP: dict[str, dict] = {
+    "BRIT3":  {"new": "BRST3",  "note": "Renamed after incorporation by Brisanet Serviços (Nov 2024)"},
+    "CVBI11": {"new": "PCIP11", "note": "Fund renamed on B3 (Sep 2025)"},
+    "MALL11": {"new": "PMLL11", "note": "Fund renamed on B3 (Jul 2025)"},
+    "RVBI11": {"new": "PSEC11", "note": "Fund renamed on B3 (Oct 2025)"},
 }
 
 # tickers that have been delisted or wound down with no successor and no tradeable value.
 # positions in these are excluded from portfolio calculations to avoid distorting totals.
-DISCONTINUED_TICKERS = {
-    "LSPA11",  # Leste Riva Equity - fund in wind-down, last trade Dec 2024
+# maps ticker → reason string shown in the Ticker Changes tab.
+DISCONTINUED_TICKERS: dict[str, str] = {
+    "LSPA11": "Leste Riva Equity — fund in wind-down, last trade Dec 2024",
 }
 
 
@@ -342,11 +345,11 @@ def fetch_market_prices(tickers):
     prices = {t: {"p": None, "live": False} for t in tickers}
     try:
         # resolve any renamed tickers before querying Yahoo Finance
-        sa_tickers = [f"{TICKER_REMAP.get(t, t)}.SA" for t in tickers]
+        sa_tickers = [f"{TICKER_REMAP[t]['new'] if t in TICKER_REMAP else t}.SA" for t in tickers]
         data = yf.download(sa_tickers, period="1mo", progress=False, group_by="ticker", auto_adjust=True)
         for t in tickers:
             try:
-                s = f"{TICKER_REMAP.get(t, t)}.SA"
+                s = f"{TICKER_REMAP[t]['new'] if t in TICKER_REMAP else t}.SA"
                 close = data[s]["Close"] if len(tickers) > 1 else data["Close"]
                 price = close.dropna().iloc[-1].item()
                 prices[t] = {"p": price, "live": True}

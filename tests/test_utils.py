@@ -187,7 +187,15 @@ def test_calculate_portfolio_skips_discontinued_tickers():
 
 
 def test_ticker_remap_maps_brit3_to_brst3():
-    assert utils.TICKER_REMAP["BRIT3"] == "BRST3"
+    assert utils.TICKER_REMAP["BRIT3"]["new"] == "BRST3"
+    assert "note" in utils.TICKER_REMAP["BRIT3"]
+
+
+def test_discontinued_tickers_is_dict_with_reasons():
+    assert isinstance(utils.DISCONTINUED_TICKERS, dict)
+    # every entry must have a non-empty reason string
+    for ticker, reason in utils.DISCONTINUED_TICKERS.items():
+        assert isinstance(reason, str) and reason
 
 
 def test_get_exchange_rate_uses_yfinance_response(monkeypatch):
