@@ -62,6 +62,25 @@ LANGUAGES = {
         'ticker_changes_discontinued_col_ticker': 'Ticker',
         'ticker_changes_discontinued_col_reason': 'Reason',
         'ticker_changes_no_data': 'Import a B3 statement to see which of these tickers appear in your portfolio.',
+
+        # --- Ticker changes: corporate actions section ---
+        'ticker_changes_corp_title': 'Corporate actions in your portfolio',
+        'ticker_changes_corp_desc': 'Split and reverse-split events sourced from Yahoo Finance for the tickers in your portfolio. These are applied automatically to keep quantities and cost basis accurate.',
+        'ticker_changes_corp_no_data': 'No corporate action history found for your portfolio tickers.',
+        'ticker_changes_corp_col_ticker': 'Ticker',
+        'ticker_changes_corp_col_date': 'Effective date',
+        'ticker_changes_corp_col_type': 'Type',
+        'ticker_changes_corp_col_ratio': 'Ratio',
+        'ticker_changes_corp_col_effect': 'Effect on shares',
+        'ticker_changes_corp_type_split': 'Forward split',
+        'ticker_changes_corp_type_reverse': 'Reverse split',
+
+        # --- Ticker changes: possibly discontinued section ---
+        'ticker_changes_possibly_disc_title': 'No live price — possibly discontinued',
+        'ticker_changes_possibly_disc_desc': 'These tickers are in your portfolio but returned no live price from Yahoo Finance. They may be delisted, merged, or renamed. If they are no longer tradeable, add them to DISCONTINUED_TICKERS in utils.py to exclude them from calculations.',
+        'ticker_changes_possibly_disc_no_data': 'All active portfolio tickers returned a live price.',
+        'ticker_changes_possibly_disc_col_ticker': 'Ticker',
+        'ticker_changes_possibly_disc_col_last_tx': 'Last transaction date',
         'audit_fees': 'Fees / taxes',
         'audit_transfers': 'Transfers / settlements',
         'audit_ignored': 'Ignored rows',
@@ -163,6 +182,25 @@ LANGUAGES = {
         'ticker_changes_discontinued_col_ticker': 'Ticker',
         'ticker_changes_discontinued_col_reason': 'Motivo',
         'ticker_changes_no_data': 'Importe um extrato B3 para ver quais destes tickers aparecem no seu portfólio.',
+
+        # --- Ticker changes: corporate actions section ---
+        'ticker_changes_corp_title': 'Eventos corporativos no seu portfólio',
+        'ticker_changes_corp_desc': 'Desdobramentos e grupamentos obtidos do Yahoo Finance para os tickers do seu portfólio. Esses eventos são aplicados automaticamente para manter quantidades e custo médio corretos.',
+        'ticker_changes_corp_no_data': 'Nenhum histórico de evento corporativo encontrado para os tickers do seu portfólio.',
+        'ticker_changes_corp_col_ticker': 'Ticker',
+        'ticker_changes_corp_col_date': 'Data efetiva',
+        'ticker_changes_corp_col_type': 'Tipo',
+        'ticker_changes_corp_col_ratio': 'Fator',
+        'ticker_changes_corp_col_effect': 'Efeito nas ações',
+        'ticker_changes_corp_type_split': 'Desdobramento',
+        'ticker_changes_corp_type_reverse': 'Grupamento',
+
+        # --- Ticker changes: possibly discontinued section ---
+        'ticker_changes_possibly_disc_title': 'Sem cotação ao vivo — possivelmente descontinuados',
+        'ticker_changes_possibly_disc_desc': 'Esses tickers estão no seu portfólio mas não retornaram cotação ao vivo do Yahoo Finance. Podem estar cancelados, incorporados ou renomeados. Se não forem mais negociados, adicione-os em DISCONTINUED_TICKERS em utils.py para excluí-los dos cálculos.',
+        'ticker_changes_possibly_disc_no_data': 'Todos os tickers ativos do portfólio retornaram cotação ao vivo.',
+        'ticker_changes_possibly_disc_col_ticker': 'Ticker',
+        'ticker_changes_possibly_disc_col_last_tx': 'Última data de transação',
         'audit_fees': 'Taxas / impostos',
         'audit_transfers': 'Transferências / liquidações',
         'audit_ignored': 'Linhas ignoradas',
@@ -264,6 +302,25 @@ LANGUAGES = {
         'ticker_changes_discontinued_col_ticker': 'Ticker',
         'ticker_changes_discontinued_col_reason': 'Motivo',
         'ticker_changes_no_data': 'Importe un extracto B3 para ver cuáles de estos tickers aparecen en su cartera.',
+
+        # --- Ticker changes: corporate actions section ---
+        'ticker_changes_corp_title': 'Eventos corporativos en su cartera',
+        'ticker_changes_corp_desc': 'Divisiones y consolidaciones de acciones obtenidas de Yahoo Finance para los tickers de su cartera. Estos eventos se aplican automáticamente para mantener cantidades y precio promedio correctos.',
+        'ticker_changes_corp_no_data': 'No se encontró historial de eventos corporativos para los tickers de su cartera.',
+        'ticker_changes_corp_col_ticker': 'Ticker',
+        'ticker_changes_corp_col_date': 'Fecha efectiva',
+        'ticker_changes_corp_col_type': 'Tipo',
+        'ticker_changes_corp_col_ratio': 'Factor',
+        'ticker_changes_corp_col_effect': 'Efecto en acciones',
+        'ticker_changes_corp_type_split': 'División de acciones',
+        'ticker_changes_corp_type_reverse': 'Consolidación (agrupamiento)',
+
+        # --- Ticker changes: possibly discontinued section ---
+        'ticker_changes_possibly_disc_title': 'Sin precio en vivo — posiblemente descontinuados',
+        'ticker_changes_possibly_disc_desc': 'Estos tickers están en su cartera pero no devolvieron precio en vivo de Yahoo Finance. Pueden estar retirados, fusionados o renombrados. Si ya no se negocian, agréguelos a DISCONTINUED_TICKERS en utils.py para excluirlos de los cálculos.',
+        'ticker_changes_possibly_disc_no_data': 'Todos los tickers activos de la cartera devolvieron precio en vivo.',
+        'ticker_changes_possibly_disc_col_ticker': 'Ticker',
+        'ticker_changes_possibly_disc_col_last_tx': 'Fecha de última transacción',
         'audit_fees': 'Comisiones / impuestos',
         'audit_transfers': 'Transferencias / liquidaciones',
         'audit_ignored': 'Filas ignoradas',
@@ -365,6 +422,25 @@ LANGUAGES = {
         'ticker_changes_discontinued_col_ticker': 'Ticker',
         'ticker_changes_discontinued_col_reason': 'Raison',
         'ticker_changes_no_data': 'Importez un relevé B3 pour voir lesquels de ces tickers figurent dans votre portefeuille.',
+
+        # --- Ticker changes: corporate actions section ---
+        'ticker_changes_corp_title': 'Événements corporatifs dans votre portefeuille',
+        'ticker_changes_corp_desc': 'Divisions et regroupements d\u2019actions issus de Yahoo Finance pour les tickers de votre portefeuille. Ces événements sont appliqués automatiquement pour maintenir des quantités et un coût moyen corrects.',
+        'ticker_changes_corp_no_data': 'Aucun historique d\u2019événement corporatif trouvé pour les tickers de votre portefeuille.',
+        'ticker_changes_corp_col_ticker': 'Ticker',
+        'ticker_changes_corp_col_date': 'Date effective',
+        'ticker_changes_corp_col_type': 'Type',
+        'ticker_changes_corp_col_ratio': 'Facteur',
+        'ticker_changes_corp_col_effect': 'Effet sur les actions',
+        'ticker_changes_corp_type_split': 'Division d\u2019actions',
+        'ticker_changes_corp_type_reverse': 'Regroupement d\u2019actions',
+
+        # --- Ticker changes: possibly discontinued section ---
+        'ticker_changes_possibly_disc_title': 'Pas de cours en direct — possiblement abandonnés',
+        'ticker_changes_possibly_disc_desc': 'Ces tickers sont dans votre portefeuille mais n\u2019ont retourné aucun cours en direct de Yahoo Finance. Ils peuvent être retirés, fusionnés ou renommés. S\u2019ils ne sont plus négociables, ajoutez-les à DISCONTINUED_TICKERS dans utils.py pour les exclure des calculs.',
+        'ticker_changes_possibly_disc_no_data': 'Tous les tickers actifs du portefeuille ont retourné un cours en direct.',
+        'ticker_changes_possibly_disc_col_ticker': 'Ticker',
+        'ticker_changes_possibly_disc_col_last_tx': 'Date de dernière transaction',
         'audit_fees': 'Frais / impôts',
         'audit_transfers': 'Transferts / règlements',
         'audit_ignored': 'Lignes ignorées',

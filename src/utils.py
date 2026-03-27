@@ -289,15 +289,46 @@ def load_and_process_files(uploaded_files):
     return main_df, stats_df, audit_df
 
 
-def calculate_portfolio(df):
+def calculate_portfolio(df, split_history=None):
+    """Compute current positions and cost basis for each ticker.
+
+    split_history: optional dict from fetch_split_history().
+    When provided, yfinance split events are injected for tickers that have
+    no MOV-sourced corporate action rows (Grupamento / Desdobramento / Bonificação).
+    This ensures correct qty/cost even when only a NEG file was uploaded.
+    """
     summary = []
 
     for ticker, data in df.groupby('ticker'):
         if ticker in DISCONTINUED_TICKERS:
             logger.debug("Skipping discontinued ticker %s.", ticker)
             continue
-        data = data.sort_values('date')
+        data = data.sort_values('date').copy()
         qty, cost, earnings = 0.0, 0.0, 0.0
+
+        # only inject yfinance splits when the MOV file didn't already supply them,
+        # to avoid double-applying the same corporate action from two sources.
+        has_mov_splits = data['type'].isin(['SPLIT', 'REVERSE_SPLIT']).any()
+
+        if not has_mov_splits and split_history and ticker in split_history:
+            synthetic = []
+            for ev in split_history[ticker]:
+                split_type = 'SPLIT' if ev['ratio'] >= 1.0 else 'REVERSE_SPLIT'
+                synthetic.append({
+                    'date': ev['date'],
+                    'ticker': ticker,
+                    'type': split_type,
+                    # store ratio in the qty field; identified by source='yfinance_split'
+                    'qty': ev['ratio'],
+                    'val': 0.0,
+                    'source': 'yfinance_split',
+                })
+            if synthetic:
+                extra = pd.DataFrame(synthetic)
+                for col in data.columns:
+                    if col not in extra.columns:
+                        extra[col] = None
+                data = pd.concat([data, extra], ignore_index=True).sort_values('date')
 
         for _, row in data.iterrows():
             if row['type'] == 'BUY':
@@ -327,15 +358,22 @@ def calculate_portfolio(df):
                 earnings += float(row.get('val', 0) or 0)
 
             elif row['type'] == 'SPLIT':
-                # desdobramento or bonificação: new shares added at zero cost, total cost unchanged
-                qty += float(row.get('qty', 0) or 0)
+                if str(row.get('source', '')) == 'yfinance_split':
+                    # ratio stored in qty: multiply current position
+                    qty = qty * float(row.get('qty', 1.0) or 1.0)
+                else:
+                    # MOV-sourced: qty column holds the number of new shares credited
+                    qty += float(row.get('qty', 0) or 0)
 
             elif row['type'] == 'REVERSE_SPLIT':
-                # grupamento: entry records the new consolidated qty for this custodian.
-                # cost basis is unchanged; avg cost per share rises proportionally.
-                new_qty = float(row.get('qty', 0) or 0)
-                if new_qty > 0:
-                    qty = new_qty
+                if str(row.get('source', '')) == 'yfinance_split':
+                    # ratio stored in qty: multiply current position (ratio < 1 so qty shrinks)
+                    qty = qty * float(row.get('qty', 1.0) or 1.0)
+                else:
+                    # MOV-sourced: qty column holds the exact post-grupamento shares
+                    new_qty = float(row.get('qty', 0) or 0)
+                    if new_qty > 0:
+                        qty = new_qty
 
         if round(qty, 4) > 0 or earnings != 0:
             summary.append(
@@ -350,6 +388,34 @@ def calculate_portfolio(df):
             )
 
     return pd.DataFrame(summary)
+
+
+@st.cache_data(ttl=86400)
+def fetch_split_history(tickers: tuple) -> dict:
+    """Fetch split/reverse-split history from yfinance for every ticker.
+
+    Uses a 24-hour TTL because splits are rare and don't change intraday.
+    Accepts a tuple (not list) so st.cache_data can hash the argument.
+
+    Returns {ticker: [{'date': pd.Timestamp, 'ratio': float}, ...]} where
+    ratio > 1 is a forward split (more shares) and ratio < 1 is a reverse split.
+    """
+    result = {}
+    for t in tickers:
+        sa = f"{TICKER_REMAP[t]['new'] if t in TICKER_REMAP else t}.SA"
+        try:
+            splits = yf.Ticker(sa).splits
+            if splits is not None and not splits.empty:
+                events = []
+                for dt, ratio in splits.items():
+                    ts = pd.Timestamp(dt)
+                    if ts.tzinfo is not None:
+                        ts = ts.tz_localize(None)
+                    events.append({"date": ts, "ratio": float(ratio)})
+                result[t] = sorted(events, key=lambda x: x["date"])
+        except Exception:
+            logger.debug("Could not fetch split history for %s.", sa)
+    return result
 
 
 @st.cache_data(ttl=3600)

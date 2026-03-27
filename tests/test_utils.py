@@ -345,3 +345,96 @@ def test_calculate_portfolio_full_mglu3_corporate_action_sequence():
     assert row["qty"] == pytest.approx(4.0, abs=0.01)
     # cost basis must be positive and less than the original R$65.28
     assert 0 < row["avg_price"] * row["qty"] < 65.28
+
+
+def test_fetch_split_history_returns_events_for_known_ticker(monkeypatch):
+    import pandas as pd
+
+    # mock yfinance returning one forward split and one reverse split
+    mock_splits = pd.Series(
+        [4.0, 0.1],
+        index=pd.to_datetime(["2020-10-14", "2024-05-27"]).tz_localize("America/Sao_Paulo"),
+    )
+
+    class MockTicker:
+        def __init__(self, _symbol):
+            self.splits = mock_splits
+
+    monkeypatch.setattr(utils.yf, "Ticker", MockTicker)
+
+    result = utils.fetch_split_history.__wrapped__(("MGLU3",))
+    assert "MGLU3" in result
+    events = result["MGLU3"]
+    assert len(events) == 2
+    # check dates are tz-naive
+    assert events[0]["date"].tzinfo is None
+    assert events[0]["ratio"] == pytest.approx(4.0)
+    assert events[1]["ratio"] == pytest.approx(0.1)
+
+
+def test_fetch_split_history_returns_empty_for_no_data(monkeypatch):
+    import pandas as pd
+
+    class MockTicker:
+        def __init__(self, _symbol):
+            self.splits = pd.Series([], dtype=float)
+
+    monkeypatch.setattr(utils.yf, "Ticker", MockTicker)
+
+    result = utils.fetch_split_history.__wrapped__(("UNKNOWN99",))
+    assert result == {}
+
+
+def test_calculate_portfolio_uses_yfinance_splits_when_no_mov(monkeypatch):
+    # NEG-only scenario: buy 48 MGLU3 at R$1.36, no MOV corporate action rows.
+    # split_history provides the 10:1 reverse split (ratio=0.1) and 5% bonus (1.05).
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2024-05-24"]),
+            "ticker": ["MGLU3"],
+            "type": ["BUY"],
+            "qty": [48.0],
+            "val": [65.28],
+        }
+    )
+
+    split_history = {
+        "MGLU3": [
+            {"date": pd.Timestamp("2024-05-27"), "ratio": 0.1},   # grupamento 10:1
+            {"date": pd.Timestamp("2025-12-30"), "ratio": 1.05},  # bonificação 5%
+        ]
+    }
+
+    out = utils.calculate_portfolio(df, split_history=split_history)
+    row = out[out["ticker"] == "MGLU3"].iloc[0]
+
+    # after 10:1 reverse (48→4.8) then 5% bonus (4.8→5.04)
+    assert row["qty"] == pytest.approx(5.04, abs=0.01)
+    # cost is preserved; avg_price rises from R$1.36 to ~R$12.95
+    assert row["avg_price"] == pytest.approx(65.28 / 5.04, abs=0.01)
+
+
+def test_calculate_portfolio_yfinance_splits_not_applied_when_mov_exists():
+    # if MOV data already provides REVERSE_SPLIT rows, yfinance splits must be skipped
+    # entirely to avoid double-applying the same corporate action.
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2024-05-24", "2024-05-28"]),
+            "ticker": ["MGLU3", "MGLU3"],
+            "type": ["BUY", "REVERSE_SPLIT"],
+            "qty": [48.0, 4.8],
+            "val": [65.28, 0.0],
+            "source": ["NEG", "MOV"],
+        }
+    )
+
+    # even if split_history is provided, it must not be applied because MOV data exists
+    split_history = {
+        "MGLU3": [{"date": pd.Timestamp("2024-05-27"), "ratio": 0.1}]
+    }
+
+    out = utils.calculate_portfolio(df, split_history=split_history)
+    row = out[out["ticker"] == "MGLU3"].iloc[0]
+
+    # qty should be the MOV grupamento value (4.8), not double-applied
+    assert row["qty"] == pytest.approx(4.8, abs=0.01)

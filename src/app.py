@@ -210,7 +210,13 @@ PLOTLY_CONFIG = {
 # Main UI Logic
 if st.session_state.raw_df is not None:
     raw_df = st.session_state.raw_df
-    portfolio = utils.calculate_portfolio(raw_df)
+
+    # fetch split history for all tickers in raw data before portfolio calc,
+    # so yfinance splits can fill in for tickers without MOV corporate action rows.
+    _all_raw_tickers = tuple(sorted(raw_df['ticker'].dropna().unique().tolist()))
+    split_history = utils.fetch_split_history(_all_raw_tickers)
+
+    portfolio = utils.calculate_portfolio(raw_df, split_history=split_history)
     has_earnings = not raw_df[raw_df['type'] == 'EARNINGS'].empty
     portfolio_main = portfolio[portfolio['qty'] > 0].copy()
 
@@ -554,6 +560,71 @@ div[data-testid="stHorizontalBlock"] { row-gap: 0.15rem; column-gap: 0.15rem; }
             for ticker, reason in utils.DISCONTINUED_TICKERS.items()
         ]
         st.dataframe(pd.DataFrame(disc_rows), use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        # corporate actions fetched from yfinance for every portfolio ticker
+        st.subheader(texts['ticker_changes_corp_title'])
+        st.caption(texts['ticker_changes_corp_desc'])
+
+        corp_rows = []
+        _portfolio_tickers = set(portfolio['ticker'].unique()) if not portfolio.empty else set()
+        for t in sorted(_portfolio_tickers):
+            if t not in split_history:
+                continue
+            for ev in split_history[t]:
+                is_reverse = ev['ratio'] < 1.0
+                ev_type = texts['ticker_changes_corp_type_reverse'] if is_reverse else texts['ticker_changes_corp_type_split']
+                if is_reverse:
+                    # ratio=0.1 means 10:1 grouping
+                    n = round(1 / ev['ratio'])
+                    effect = f"{n}:1 → ×{ev['ratio']:.4g}"
+                else:
+                    effect = f"1:{round(ev['ratio'])} → ×{ev['ratio']:.4g}"
+                corp_rows.append({
+                    texts['ticker_changes_corp_col_ticker']: t,
+                    texts['ticker_changes_corp_col_date']: ev['date'].strftime('%Y-%m-%d'),
+                    texts['ticker_changes_corp_col_type']: ev_type,
+                    texts['ticker_changes_corp_col_ratio']: f"{ev['ratio']:.4g}",
+                    texts['ticker_changes_corp_col_effect']: effect,
+                })
+
+        if corp_rows:
+            corp_df = pd.DataFrame(corp_rows).sort_values(
+                [texts['ticker_changes_corp_col_ticker'], texts['ticker_changes_corp_col_date']]
+            )
+            st.dataframe(corp_df, use_container_width=True, hide_index=True)
+        else:
+            st.caption(texts['ticker_changes_corp_no_data'])
+
+        st.divider()
+
+        # tickers in the current portfolio that returned no live price — potential delists
+        st.subheader(texts['ticker_changes_possibly_disc_title'])
+        st.caption(texts['ticker_changes_possibly_disc_desc'])
+
+        # compare against portfolio_main (active positions only)
+        _no_live = [t for t in portfolio_main['ticker'].unique() if not prices.get(t, {}).get('live')]
+        # exclude tickers already explicitly handled
+        _no_live = [t for t in _no_live if t not in utils.DISCONTINUED_TICKERS]
+
+        if _no_live:
+            def _last_tx(t):
+                rows = raw_df[raw_df['ticker'] == t]
+                if rows.empty:
+                    return '—'
+                return pd.to_datetime(rows['date']).max().strftime('%Y-%m-%d')
+
+            possibly_disc_rows = [
+                {
+                    texts['ticker_changes_possibly_disc_col_ticker']: t,
+                    texts['ticker_changes_possibly_disc_col_last_tx']: _last_tx(t),
+                }
+                for t in sorted(_no_live)
+            ]
+            st.dataframe(pd.DataFrame(possibly_disc_rows), use_container_width=True, hide_index=True)
+        else:
+            st.caption(texts['ticker_changes_possibly_disc_no_data'])
 
 else:
     st.title(texts['welcome_title'])
