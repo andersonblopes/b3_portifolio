@@ -30,6 +30,14 @@ warnings.filterwarnings(
     message=r".*Workbook contains no default style.*",
 )
 
+# some FIIs and stocks change their B3 ticker code over time (renaming, fund mergers, etc.)
+# keys are the codes that appear in old B3 exports; values are the current active codes on Yahoo Finance.
+TICKER_REMAP = {
+    "CVBI11": "PCIP11",  # renamed 24/09/2025
+    "MALL11": "PMLL11",  # renamed 22/07/2025
+    "RVBI11": "PSEC11",  # renamed 24/10/2025
+}
+
 
 @st.cache_data(ttl=3600)
 def get_exchange_rate(base_currency: str = "USD"):
@@ -323,11 +331,12 @@ def fetch_market_prices(tickers):
         return {}
     prices = {t: {"p": None, "live": False} for t in tickers}
     try:
-        sa_tickers = [f"{t}.SA" for t in tickers]
+        # resolve any renamed tickers before querying Yahoo Finance
+        sa_tickers = [f"{TICKER_REMAP.get(t, t)}.SA" for t in tickers]
         data = yf.download(sa_tickers, period="1mo", progress=False, group_by="ticker", auto_adjust=True)
         for t in tickers:
             try:
-                s = f"{t}.SA"
+                s = f"{TICKER_REMAP.get(t, t)}.SA"
                 close = data[s]["Close"] if len(tickers) > 1 else data["Close"]
                 price = close.dropna().iloc[-1].item()
                 prices[t] = {"p": price, "live": True}
