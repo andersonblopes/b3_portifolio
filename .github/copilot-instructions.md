@@ -120,6 +120,7 @@ B3 `.xlsx` export files used as input are always located at:
 When testing locally, referencing sample files, or pointing the app at real statements, always use this directory as the base path.
 
 ## Known Limitations / Watch Points
-- Market prices and FX rates are fetched from **brapi.dev**. A free token is required; without one the app falls back to fixed FX rates and shows no live prices. Get a token at https://brapi.dev/dashboard and set it via the sidebar or the `BRAPI_TOKEN` env var.
+- **Market prices** are fetched via **yfinance** using the `.SA` suffix (covers all B3 tickers). No token required.
+- **FX rates** (USD/BRL, EUR/BRL) are fetched from **brapi.dev**. A free token is optional; without one the app falls back to fixed rates. Get a token at https://brapi.dev/dashboard and set it via the sidebar or the `BRAPI_TOKEN` env var.
 - `calculate_portfolio` iterates row-by-row in Python — acceptable for personal statement sizes, but avoid adding more loop-based logic there.
 - `detect_asset_type` uses simple suffix matching; edge cases (e.g. single-letter tickers) may misclassify.

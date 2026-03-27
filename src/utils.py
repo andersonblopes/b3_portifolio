@@ -7,6 +7,7 @@ import unicodedata
 import pandas as pd
 import requests
 import streamlit as st
+import yfinance as yf
 
 logger = logging.getLogger(__name__)
 
@@ -323,23 +324,25 @@ def calculate_portfolio(df):
 
 
 @st.cache_data(ttl=3600)
-def fetch_market_prices(tickers, token: str = ""):
+def fetch_market_prices(tickers):
+    """Fetch latest prices for B3 tickers via yfinance (.SA suffix).
+
+    Returns a dict: {ticker: {"p": float|None, "live": bool}}
+    """
     if not tickers:
         return {}
     prices = {t: {"p": None, "live": False} for t in tickers}
     try:
-        headers = {"Authorization": f"Bearer {token}"} if token else {}
-        resp = requests.get(
-            f"https://brapi.dev/api/quote/{','.join(tickers)}",
-            headers=headers,
-            timeout=15,
-        )
-        resp.raise_for_status()
-        results_map = {r["symbol"]: r for r in resp.json().get("results", [])}
+        sa_tickers = [f"{t}.SA" for t in tickers]
+        data = yf.download(sa_tickers, period="1d", progress=False, group_by="ticker", auto_adjust=True)
         for t in tickers:
-            r = results_map.get(t)
-            if r and r.get("regularMarketPrice") is not None:
-                prices[t] = {"p": float(r["regularMarketPrice"]), "live": True}
+            try:
+                s = f"{t}.SA"
+                close = data[s]["Close"] if len(tickers) > 1 else data["Close"]
+                price = close.dropna().iloc[-1].item()
+                prices[t] = {"p": price, "live": True}
+            except Exception:
+                logger.debug("No yfinance price for %s.", t)
     except Exception:
-        logger.exception("Failed to fetch prices from brapi.dev.")
+        logger.exception("yfinance batch download failed.")
     return prices
