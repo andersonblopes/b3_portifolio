@@ -192,6 +192,15 @@ def load_and_process_files(uploaded_files):
                     return 'FEES'
                 if any(t in m_upper for t in transfer_terms):
                     return 'TRANSFER'
+                # reverse split: B3 records the new consolidated qty as a credit
+                if 'GRUPAMENTO' in m_upper:
+                    return 'REVERSE_SPLIT'
+                # split / bonus shares: additional shares credited at zero cost
+                if 'DESDOBRAMENTO' in m_upper or 'BONIFICACAO' in m_upper:
+                    return 'SPLIT'
+                # fractional shares removed by the custodian (proceeds come via leilão)
+                if 'FRACAO EM ATIVOS' in m_upper:
+                    return 'SELL'
                 return 'IGNORE'
 
             temp['type'] = df['Movimentação'].apply(map_mov)
@@ -223,10 +232,12 @@ def load_and_process_files(uploaded_files):
                 }
             )
 
-            # Keep only earnings in the main dataset for now (so existing views remain consistent).
-            all_data.append(temp[temp['type'] == 'EARNINGS'])
+            # corporate actions (splits, reverse splits, fractional debits) must flow into
+            # main_df alongside earnings so calculate_portfolio can adjust share counts.
+            _main_types = {'EARNINGS', 'SPLIT', 'REVERSE_SPLIT', 'SELL'}
+            all_data.append(temp[temp['type'].isin(_main_types)])
 
-            audit_rows.append(temp[temp['type'] != 'EARNINGS'])
+            audit_rows.append(temp[~temp['type'].isin(_main_types)])
 
     main_df = pd.concat(all_data).sort_values(by='date', ascending=False) if all_data else pd.DataFrame()
     stats_df = pd.DataFrame(stats_rows).sort_values(['file', 'detected']) if stats_rows else None
@@ -314,6 +325,17 @@ def calculate_portfolio(df):
 
             elif row['type'] == 'EARNINGS':
                 earnings += float(row.get('val', 0) or 0)
+
+            elif row['type'] == 'SPLIT':
+                # desdobramento or bonificação: new shares added at zero cost, total cost unchanged
+                qty += float(row.get('qty', 0) or 0)
+
+            elif row['type'] == 'REVERSE_SPLIT':
+                # grupamento: entry records the new consolidated qty for this custodian.
+                # cost basis is unchanged; avg cost per share rises proportionally.
+                new_qty = float(row.get('qty', 0) or 0)
+                if new_qty > 0:
+                    qty = new_qty
 
         if round(qty, 4) > 0 or earnings != 0:
             summary.append(

@@ -1,4 +1,5 @@
 import io
+import pytest
 from types import SimpleNamespace
 
 import pandas as pd
@@ -249,3 +250,98 @@ def test_fetch_market_prices_fallback_on_yfinance_error(monkeypatch):
 
 def test_fetch_market_prices_returns_empty_for_no_tickers():
     assert utils.fetch_market_prices.__wrapped__([]) == {}
+
+
+def test_load_and_process_movimentacao_routes_corporate_actions_to_main_df():
+    df = pd.DataFrame(
+        {
+            "Data": ["28/05/2024", "28/05/2024", "31/05/2024", "02/01/2026"],
+            "Produto": ["MGLU3", "MGLU3", "MGLU3", "MGLU3"],
+            "Instituição": ["XP", "XP", "XP", "XP"],
+            "Quantidade": [4.8, 0.0, 0.8, 0.2],
+            "Valor da Operação": [0.0, 5.0, 0.0, 0.0],
+            "Movimentação": ["Grupamento", "Dividendo", "Fração em Ativos", "Bonificação em Ativos"],
+            "Entrada/Saída": ["Credito", "Credito", "Debito", "Credito"],
+        }
+    )
+
+    main_df, _, audit_df = utils.load_and_process_files([_uploaded_file(df, "mov.xlsx")])
+
+    main_types = set(main_df["type"].unique())
+    # all three corporate action types must reach main_df
+    assert "REVERSE_SPLIT" in main_types
+    assert "SELL" in main_types
+    assert "SPLIT" in main_types
+    assert "EARNINGS" in main_types
+    # none of them should leak into audit
+    assert "REVERSE_SPLIT" not in set(audit_df["type"].unique())
+    assert "SPLIT" not in set(audit_df["type"].unique())
+
+
+def test_calculate_portfolio_applies_reverse_split_correctly():
+    # simulate: buy 48 shares, then 10:1 grupamento credits 4.8 new shares
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2024-05-24", "2024-05-28"]),
+            "ticker": ["MGLU3", "MGLU3"],
+            "type": ["BUY", "REVERSE_SPLIT"],
+            "qty": [48.0, 4.8],
+            "val": [65.28, 0.0],
+        }
+    )
+
+    out = utils.calculate_portfolio(df)
+    row = out[out["ticker"] == "MGLU3"].iloc[0]
+
+    # qty must reflect the post-grupamento count
+    assert row["qty"] == pytest.approx(4.8, abs=0.01)
+    # total cost is preserved by the grupamento
+    assert row["avg_price"] == pytest.approx(65.28 / 4.8, abs=0.01)
+
+
+def test_calculate_portfolio_applies_split_correctly():
+    # simulate: buy 10 shares, then 1:4 desdobramento adds 30 more
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2019-08-01", "2019-08-05"]),
+            "ticker": ["MGLU3", "MGLU3"],
+            "type": ["BUY", "SPLIT"],
+            "qty": [10.0, 30.0],
+            "val": [100.0, 0.0],
+        }
+    )
+
+    out = utils.calculate_portfolio(df)
+    row = out[out["ticker"] == "MGLU3"].iloc[0]
+
+    assert row["qty"] == pytest.approx(40.0, abs=0.01)
+    # total cost unchanged; avg cost quartered
+    assert row["avg_price"] == pytest.approx(2.50, abs=0.01)
+
+
+def test_calculate_portfolio_full_mglu3_corporate_action_sequence():
+    # reproduces the MGLU3 scenario: buy 48 pre-grupamento, grupamento 10:1,
+    # fractional sell 0.8, bonificação adds 0.2, fractional sell 0.2
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime([
+                "2024-05-24",  # buy 48 @ 1.36
+                "2024-05-28",  # grupamento → 4.8
+                "2024-05-31",  # fração em ativos sell 0.8
+                "2026-01-02",  # bonificação +0.2
+                "2026-02-09",  # fração em ativos sell 0.2
+            ]),
+            "ticker": ["MGLU3"] * 5,
+            "type": ["BUY", "REVERSE_SPLIT", "SELL", "SPLIT", "SELL"],
+            "qty": [48.0, 4.8, 0.8, 0.2, 0.2],
+            "val": [65.28, 0.0, 0.0, 0.0, 0.0],
+        }
+    )
+
+    out = utils.calculate_portfolio(df)
+    row = out[out["ticker"] == "MGLU3"].iloc[0]
+
+    # after all corporate actions: 4.0 shares remaining
+    assert row["qty"] == pytest.approx(4.0, abs=0.01)
+    # cost basis must be positive and less than the original R$65.28
+    assert 0 < row["avg_price"] * row["qty"] < 65.28
