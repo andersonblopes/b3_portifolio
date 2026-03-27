@@ -79,49 +79,68 @@ def _show_analysis_modal(ticker, analysis, fmt_reg, texts):
     elif analysis['scenario'] == 'loss':
         st.write(texts['analysis_no_dca'])
 
-    # risk warnings
-    _warnings = []
-    if analysis.get('price_below_stop'):
-        _warnings.append(texts['risk_exit_alert'].format(
-            price=fmt_reg(analysis.get('current_price', 0)),
-            stop=fmt_reg(analysis['trailing_stop']),
-        ))
-    if analysis['yield_pct'] < -30:
-        _warnings.append(texts['risk_sunk_cost'])
-    # concentration warning at section level only when every DCA scenario is blocked
-    if analysis['dca'] and all(_d.get('concentration_risk') for _d in analysis['dca']):
-        _worst = max(_d.get('new_weight', 0.0) for _d in analysis['dca'])
-        _warnings.append(texts['risk_concentration'].format(weight=_worst))
-
-    if _warnings:
+    # risk warnings — rendered as structured blocks, not inline string interpolation
+    # (fmt_reg produces "R$ x,xx"; embedding that in markdown triggers LaTeX rendering)
+    _has_warnings = (
+        analysis.get('price_below_stop')
+        or analysis['yield_pct'] < -30
+        or (analysis['dca'] and all(_d.get('concentration_risk') for _d in analysis['dca']))
+    )
+    if _has_warnings:
         st.divider()
         st.markdown(f"##### {texts['analysis_risk_section_title']}")
-        for _w in _warnings:
-            st.warning(_w)
 
-    # actionable next step
+    if analysis.get('price_below_stop'):
+        _rc1, _rc2 = st.columns(2)
+        _rc1.metric(texts['analysis_current_return'], fmt_reg(analysis.get('current_price', 0)),
+                    delta=f"{analysis['yield_pct']:+.1f}%", delta_color="inverse")
+        _rc2.metric(texts['analysis_trailing_stop'], fmt_reg(analysis['trailing_stop']))
+        st.warning("🚨 " + texts['risk_exit_alert'].split('{')[0].strip())
+
+    if analysis['yield_pct'] < -30:
+        st.warning(texts['risk_sunk_cost'])
+
+    if analysis['dca'] and all(_d.get('concentration_risk') for _d in analysis['dca']):
+        _worst = max(_d.get('new_weight', 0.0) for _d in analysis['dca'])
+        _rc1, _rc2 = st.columns(2)
+        _rc1.metric(texts['analysis_post_dca_weight'], f"{_worst:.1f}%", delta="limit: 10%", delta_color="inverse")
+        st.warning("⚠️ " + texts['risk_concentration'].split('{')[0].strip())
+
+
+    # actionable next step — keep currency values out of markdown text
     _yoc = analysis.get('yield_on_cost', 0.0)
-    _stop_fmt = fmt_reg(analysis['trailing_stop'])
+    _stop_val = analysis['trailing_stop']
     if rec == 'exit':
-        _action = texts['action_exit'].format(stop=_stop_fmt)
+        _action = texts['action_exit'].split('{')[0].strip().rstrip('or').strip()
+        _action_extra = fmt_reg(_stop_val)
     elif rec == 'trim':
         _action = texts['action_trim']
+        _action_extra = None
     elif rec == 'hold' and _yoc >= 8.0 and analysis['scenario'] == 'loss':
         _action = texts['action_hold_dividend'].format(yoc=_yoc)
+        _action_extra = None
     elif rec == 'dca' and analysis['dca'] and all(_d.get('concentration_risk') for _d in analysis['dca']):
         _action = texts['action_dca_blocked']
+        _action_extra = None
     elif rec == 'dca' and analysis['dca']:
         _best = next((_d for _d in analysis['dca'] if not _d.get('concentration_risk')), analysis['dca'][0])
-        _action = texts['action_dca'].format(
-            capital=fmt_reg(_best['add_qty'] * _best['add_price']),
-            new_avg=fmt_reg(_best['new_avg']),
-        )
+        # split capital and new_avg into metrics; strip the template placeholders from the label
+        _action = texts['action_dca'].split('{')[0].strip()
+        _action_extra = None
     else:
         _action = texts['action_hold']
+        _action_extra = None
 
     st.divider()
     st.markdown(f"##### {texts['analysis_action_title']}")
     st.success(f"➡️ {_action}")
+    if rec == 'exit' and _action_extra:
+        st.metric(texts['analysis_trailing_stop'], _action_extra)
+    if rec == 'dca' and analysis['dca']:
+        _best = next((_d for _d in analysis['dca'] if not _d.get('concentration_risk')), analysis['dca'][0])
+        _ac1, _ac2 = st.columns(2)
+        _ac1.metric(texts['analysis_dca_new_total'], fmt_reg(_best['add_qty'] * _best['add_price']))
+        _ac2.metric(texts['analysis_dca_new_avg'], fmt_reg(_best['new_avg']))
 
 
 @st.fragment
