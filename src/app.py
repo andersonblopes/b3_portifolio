@@ -567,12 +567,24 @@ div[data-testid="stHorizontalBlock"] { row-gap: 0.15rem; column-gap: 0.15rem; }
         st.subheader(texts['ticker_changes_corp_title'])
         st.caption(texts['ticker_changes_corp_desc'])
 
+        # first buy date per ticker — events before this date are irrelevant
+        _first_buy = (
+            raw_df[raw_df['type'] == 'BUY']
+            .groupby('ticker')['date']
+            .min()
+            .apply(pd.Timestamp)
+        )
+
         corp_rows = []
         _portfolio_tickers = set(portfolio['ticker'].unique()) if not portfolio.empty else set()
         for t in sorted(_portfolio_tickers):
             if t not in split_history:
                 continue
+            first_buy = _first_buy.get(t)
             for ev in split_history[t]:
+                # skip events that pre-date the first purchase of this ticker
+                if first_buy is not None and ev['date'] < first_buy:
+                    continue
                 is_reverse = ev['ratio'] < 1.0
                 ev_type = texts['ticker_changes_corp_type_reverse'] if is_reverse else texts['ticker_changes_corp_type_split']
                 if is_reverse:
