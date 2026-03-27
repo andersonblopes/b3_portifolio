@@ -27,10 +27,24 @@ def test_clean_ticker_handles_fractional_and_noise():
     assert utils.clean_ticker("ABCD11 - FUNDO") == "ABCD11"
 
 
+def test_clean_ticker_bdr_34_suffix_not_truncated():
+    # regression: regex order bug caused VERZ34 to be parsed as VERZ3
+    assert utils.clean_ticker("VERZ34 - VERIZON COMMUNICATIONS INC.") == "VERZ34"
+    assert utils.clean_ticker("AAPL34") == "AAPL34"
+    assert utils.clean_ticker("MSFT34") == "MSFT34"
+
+
 def test_detect_asset_type_basic():
     assert utils.detect_asset_type("HGLG11") == "FII/ETF"
     assert utils.detect_asset_type("AAPL34") == "BDR"
     assert utils.detect_asset_type("PETR4") == "Ação"
+
+
+def test_detect_asset_type_pn2_shares():
+    # *2 tickers (e.g. BMGB2) were classified as 'Outro' before the fix
+    assert utils.detect_asset_type("BMGB2") == "Ação"
+    assert utils.detect_asset_type("VALE7") == "Ação"
+    assert utils.detect_asset_type("PETR8") == "Ação"
 
 
 def test_load_and_process_negociacao_parses_buy_sell_and_audit_ignore():
@@ -65,6 +79,7 @@ def test_load_and_process_movimentacao_applies_sign_and_classification():
             "Data": ["01/02/2026", "02/02/2026", "03/02/2026"],
             "Produto": ["HGLG11", "HGLG11", "HGLG11"],
             "Instituição": ["BTG", "BTG", "BTG"],
+            "Quantidade": [148.0, 0.0, 0.0],
             "Valor da Operação": [10.0, 1.0, 7.0],
             "Movimentação": ["RENDIMENTO", "TAXA DE CUSTÓDIA", "TRANSFERÊNCIA"],
             "Entrada/Saída": ["Crédito", "Débito", "Crédito"],
@@ -76,6 +91,9 @@ def test_load_and_process_movimentacao_applies_sign_and_classification():
     # Only earnings are kept in main
     assert set(main_df["type"].unique()) == {"EARNINGS"}
     assert main_df["val"].iloc[0] == 10.0
+
+    # qty is now extracted from the Quantidade column
+    assert main_df["qty"].iloc[0] == 148.0
 
     # Fees/transfer go to audit; fee is negative due to Débito
     assert set(audit_df["type"].unique()) == {"FEES", "TRANSFER"}
@@ -90,12 +108,33 @@ def test_load_and_process_movimentacao_applies_sign_and_classification():
     assert row["rows_transfer"] == 1
 
 
+def test_load_and_process_movimentacao_classifies_emprestimo_and_leilao():
+    df = pd.DataFrame(
+        {
+            "Data": ["01/02/2026", "02/02/2026", "03/02/2026"],
+            "Produto": ["PETR4", "MGLU3", "VALE3"],
+            "Instituição": ["BTG", "BTG", "BTG"],
+            "Quantidade": [0.0, 0.0, 0.0],
+            "Valor da Operação": [5.0, 2.0, 1.0],
+            "Movimentação": ["Empréstimo", "Leilão de Fração", "Reembolso"],
+            "Entrada/Saída": ["Credito", "Credito", "Credito"],
+        }
+    )
+
+    main_df, stats_df, audit_df = utils.load_and_process_files([_uploaded_file(df, "mov.xlsx")])
+
+    # all three should flow into EARNINGS, not IGNORE
+    assert len(main_df) == 3
+    assert (main_df["type"] == "EARNINGS").all()
+
+
 def test_dedup_across_multiple_uploads_adds_summary_row():
     df = pd.DataFrame(
         {
             "Data": ["01/02/2026"],
             "Produto": ["HGLG11"],
             "Instituição": ["BTG"],
+            "Quantidade": [10.0],
             "Valor da Operação": [10.0],
             "Movimentação": ["RENDIMENTO"],
             "Entrada/Saída": ["Crédito"],

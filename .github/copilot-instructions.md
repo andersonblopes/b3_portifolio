@@ -109,6 +109,16 @@ git commit -m "✨ feat: added AMAZING new stuff!!! 🚀"
 - When changing install steps, build commands, or environment requirements, update the README immediately — do not leave it stale.
 - Do not add sections to the README for internal implementation details; those belong in code comments or this file.
 
+## Report Files
+
+B3 `.xlsx` export files used as input are always located at:
+
+```
+/Users/andersonlopes/Documents/dev/projects/b3/reports
+```
+
+When testing locally, referencing sample files, or pointing the app at real statements, always use this directory as the base path.
+
 ## Known Limitations / Watch Points
 - Market prices and FX rates are fetched from **brapi.dev**. A free token is required; without one the app falls back to fixed FX rates and shows no live prices. Get a token at https://brapi.dev/dashboard and set it via the sidebar or the `BRAPI_TOKEN` env var.
 - `calculate_portfolio` iterates row-by-row in Python — acceptable for personal statement sizes, but avoid adding more loop-based logic there.

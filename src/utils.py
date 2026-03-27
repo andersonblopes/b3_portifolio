@@ -71,8 +71,9 @@ def clean_ticker(text):
 
     raw = str(text).upper().strip()
 
-    # Capture common B3 patterns and allow an optional trailing 'F' (mercado fracionário)
-    match = re.search(r"([A-Z]{4}(?:11|[3-8]|3[134]|33|34))(F)?", raw)
+    # two-digit suffixes must come before the single-digit [3-8] to prevent
+    # partial matches (e.g. VERZ34 must not be captured as VERZ3)
+    match = re.search(r"([A-Z]{4}(?:11|34|33|31|[3-8]))(F)?", raw)
     if match:
         ticker = match.group(1)
         return ticker
@@ -87,7 +88,7 @@ def detect_asset_type(ticker):
         return 'FII/ETF'
     elif any(t.endswith(s) for s in ['34', '31', '33']):
         return 'BDR'
-    elif any(t.endswith(s) for s in ['3', '4', '5', '6']):
+    elif any(t.endswith(s) for s in ['3', '4', '5', '6', '7', '8', '2']):
         return 'Ação'
     return 'Outro'
 
@@ -168,12 +169,15 @@ def load_and_process_files(uploaded_files):
                 sign = es.map(lambda x: -1 if 'DEB' in x else 1).fillna(1)
 
             temp['val'] = pd.to_numeric(df['Valor da Operação'], errors='coerce').fillna(0) * sign
+            qty_col = df['Quantidade'] if 'Quantidade' in df.columns else 0
+            temp['qty'] = pd.to_numeric(qty_col, errors='coerce').fillna(0)
             temp['desc'] = df['Movimentação'].astype(str)
 
             def map_mov(m):
                 m_upper = _norm(m)
 
-                earn_terms = ['RENDIMENTO', 'DIVIDENDO', 'JCP', 'JUROS SOBRE', 'AMORTIZA']
+                earn_terms = ['RENDIMENTO', 'DIVIDENDO', 'JCP', 'JUROS SOBRE', 'AMORTIZA',
+                              'EMPRESTIMO', 'LEILAO DE FRACAO', 'REEMBOLSO']
                 fee_terms = ['TAXA', 'TARIFA', 'IR', 'IOF']
                 transfer_terms = ['TRANSFER', 'LIQUIDA']
 
