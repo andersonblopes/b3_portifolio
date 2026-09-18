@@ -1,7 +1,7 @@
 import streamlit as st
 
 
-def render_portfolio_table(df, texts, fmt_func, selectable=False, table_key=None):
+def render_portfolio_table(df, texts, fmt_func, selectable=False, table_key=None, logos=None):
     display_cols = {
         "ticker": texts["col_ticker"],
         "qty": texts["col_qty"],
@@ -16,6 +16,14 @@ def render_portfolio_table(df, texts, fmt_func, selectable=False, table_key=None
     }
 
     display_df = df[list(display_cols.keys())].rename(columns=display_cols)
+
+    logo_col = None
+    if logos:
+        # brand logo as its own leading column so it works with dataframe
+        # styling (background_gradient) applied below on the numeric columns
+        logo_col = texts.get("col_logo", "🏢")
+        display_df = display_df.copy()
+        display_df.insert(0, logo_col, df["ticker"].map(logos))
 
     if selectable:
         # add a narrow hint column so users see rows are clickable
@@ -37,6 +45,8 @@ def render_portfolio_table(df, texts, fmt_func, selectable=False, table_key=None
 
     if selectable:
         col_cfg = {"📊": st.column_config.TextColumn(label=" ", width="small")}
+        if logo_col:
+            col_cfg[logo_col] = st.column_config.ImageColumn(label=" ", width="small")
         return st.dataframe(
             styled,
             on_select="rerun",
@@ -47,7 +57,10 @@ def render_portfolio_table(df, texts, fmt_func, selectable=False, table_key=None
             hide_index=True,
         )
 
-    st.dataframe(styled, width="stretch", hide_index=True)
+    col_cfg = None
+    if logo_col:
+        col_cfg = {logo_col: st.column_config.ImageColumn(label=" ", width="small")}
+    st.dataframe(styled, width="stretch", hide_index=True, column_config=col_cfg)
     return None
 
 

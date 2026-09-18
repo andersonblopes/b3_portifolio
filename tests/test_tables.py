@@ -89,6 +89,10 @@ def test_render_portfolio_table_selectable_returns_event(monkeypatch):
             def __init__(self, *a, **kw):
                 pass
 
+        class ImageColumn:
+            def __init__(self, *a, **kw):
+                pass
+
     monkeypatch.setattr(tables.st, "dataframe", fake_dataframe)
     monkeypatch.setattr(tables.st, "column_config", FakeColumnConfig())
 
@@ -132,3 +136,76 @@ def test_render_portfolio_table_selectable_returns_event(monkeypatch):
         df, _texts(), lambda v: f"{v:.2f}", selectable=True, table_key="k2"
     )
     assert "📊" in captured_pos["styler"].data.columns
+
+
+def test_render_portfolio_table_with_logos_adds_image_column(monkeypatch):
+    captured = {}
+
+    def fake_dataframe(arg, **kwargs):
+        captured["arg"] = arg
+        captured["kwargs"] = kwargs
+
+    class FakeColumnConfig:
+        class ImageColumn:
+            def __init__(self, *a, **kw):
+                pass
+
+    monkeypatch.setattr(tables.st, "dataframe", fake_dataframe)
+    monkeypatch.setattr(tables.st, "column_config", FakeColumnConfig())
+
+    df = pd.DataFrame(
+        {
+            "ticker": ["PETR4", "HGLG11"],
+            "qty": [10, 5],
+            "avg_price": [10.0, 100.0],
+            "total_cost": [100.0, 500.0],
+            "p_atual": [11.0, 105.0],
+            "v_mercado": [110.0, 525.0],
+            "pnl": [10.0, 25.0],
+            "yield": [10.0, 5.0],
+            "status": ["✅", "✅"],
+            "earnings": [1.0, 2.0],
+        }
+    )
+
+    logos = {"PETR4": "https://icons.brapi.dev/icons/PETR4.svg", "HGLG11": None}
+    tables.render_portfolio_table(df, _texts(), lambda v: f"{v:.2f}", logos=logos)
+
+    styler = captured["arg"]
+    logo_col = _texts().get("col_logo", "🏢")
+    assert logo_col in styler.data.columns
+    assert styler.data[logo_col].iloc[0] == "https://icons.brapi.dev/icons/PETR4.svg"
+    assert pd.isna(styler.data[logo_col].iloc[1])
+    assert logo_col in captured["kwargs"]["column_config"]
+
+
+def test_render_portfolio_table_without_logos_has_no_logo_column(monkeypatch):
+    captured = {}
+
+    def fake_dataframe(arg, **kwargs):
+        captured["arg"] = arg
+        captured["kwargs"] = kwargs
+
+    monkeypatch.setattr(tables.st, "dataframe", fake_dataframe)
+
+    df = pd.DataFrame(
+        {
+            "ticker": ["PETR4"],
+            "qty": [10],
+            "avg_price": [10.0],
+            "total_cost": [100.0],
+            "p_atual": [11.0],
+            "v_mercado": [110.0],
+            "pnl": [10.0],
+            "yield": [10.0],
+            "status": ["✅"],
+            "earnings": [1.0],
+        }
+    )
+
+    tables.render_portfolio_table(df, _texts(), lambda v: f"{v:.2f}")
+
+    styler = captured["arg"]
+    logo_col = _texts().get("col_logo", "🏢")
+    assert logo_col not in styler.data.columns
+    assert captured["kwargs"]["column_config"] is None

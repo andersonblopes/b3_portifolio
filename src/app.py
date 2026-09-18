@@ -202,6 +202,7 @@ def _data_lab_groups():
     _fmt = st.session_state._lab_fmt
     _prices = st.session_state._lab_prices
     _mkt_total = st.session_state._lab_mkt_total
+    _logos = st.session_state._lab_logos
 
     types = sorted(_pm["asset_type"].unique())
     for t in types:
@@ -215,7 +216,7 @@ def _data_lab_groups():
             _tbl_key = f"tbl_{t}"
             _prev_key = f"_analysis_prev_{t}"
             event = tables.render_portfolio_table(
-                sub_df, _texts, _fmt, selectable=True, table_key=_tbl_key
+                sub_df, _texts, _fmt, selectable=True, table_key=_tbl_key, logos=_logos
             )
             if event and event.selection.rows:
                 _idx = event.selection.rows[0]
@@ -617,6 +618,9 @@ if st.session_state.raw_df is not None:
         st.session_state._lab_fmt = fmt_reg
         st.session_state._lab_prices = prices
         st.session_state._lab_mkt_total = mkt_total
+        st.session_state._lab_logos = utils.fetch_asset_logos(
+            tuple(portfolio_main["ticker"].unique())
+        )
         _data_lab_groups()
 
     if has_earnings:

@@ -4,6 +4,7 @@ import unicodedata
 import warnings
 
 import pandas as pd
+import requests
 import streamlit as st
 import yfinance as yf
 
@@ -115,7 +116,7 @@ def load_and_process_files(uploaded_files):
 
     logger.info("Starting import of %d file(s).", len(uploaded_files))
 
-    for file in uploaded_files:
+    for file_idx, file in enumerate(uploaded_files):
         file_name = getattr(file, "name", "uploaded.xlsx")
         logger.info("Processing file: %s", file_name)
         try:
@@ -158,7 +159,9 @@ def load_and_process_files(uploaded_files):
             )
 
             audit_rows.append(temp[temp["type"] == "IGNORE"])
-            all_data.append(temp[temp["type"] != "IGNORE"])
+            temp_main = temp[temp["type"] != "IGNORE"].copy()
+            temp_main["_file_idx"] = file_idx
+            all_data.append(temp_main)
             logger.info(
                 "File %s: detected NEG statement — total=%d buy=%d sell=%d ignored=%d",
                 file_name,
@@ -227,6 +230,9 @@ def load_and_process_files(uploaded_files):
                 # fractional shares removed by the custodian (proceeds come via leilão)
                 if "FRACAO EM ATIVOS" in m_upper:
                     return "SELL"
+                # patrimonial restatement (Atualização): NAV mark-down/up, resets cost basis
+                if "ATUALIZA" in m_upper:
+                    return "COST_RESET"
                 return "IGNORE"
 
             temp["type"] = df["Movimentação"].apply(map_mov)
@@ -260,8 +266,10 @@ def load_and_process_files(uploaded_files):
 
             # corporate actions (splits, reverse splits, fractional debits) must flow into
             # main_df alongside earnings so calculate_portfolio can adjust share counts.
-            _main_types = {"EARNINGS", "SPLIT", "REVERSE_SPLIT", "SELL"}
-            all_data.append(temp[temp["type"].isin(_main_types)])
+            _main_types = {"EARNINGS", "SPLIT", "REVERSE_SPLIT", "SELL", "COST_RESET"}
+            temp_main = temp[temp["type"].isin(_main_types)].copy()
+            temp_main["_file_idx"] = file_idx
+            all_data.append(temp_main)
 
             audit_rows.append(temp[~temp["type"].isin(_main_types)])
 
@@ -294,18 +302,41 @@ def load_and_process_files(uploaded_files):
 
     # --- Deduplication across multiple uploads (common when importing overlapping periods) ---
     def _dedup(df: pd.DataFrame) -> tuple[pd.DataFrame, int, int]:
+        """Remove rows that are duplicates *across* files but preserve genuine
+        same-day same-price trades that happen to look identical within one file.
+
+        Strategy: for each group of rows sharing the same key, keep
+        max(occurrences in any single file) copies.  If file A has 2 rows and
+        file B also has 2 rows for the same key (overlap export), we keep 2 —
+        not 4.  If file A has 2 and file B has 1 (or only file A), we keep 2.
+        A plain drop_duplicates would wrongly collapse both cases to 1.
+        """
         if df is None or df.empty:
             return df, 0, 0
         before = int(len(df))
 
-        cols = [
+        key_cols = [
             c
             for c in ["date", "ticker", "type", "qty", "val", "inst", "source", "sub_type", "desc"]
             if c in df.columns
         ]
-        out = df.drop_duplicates(subset=cols, keep="first")
-        after = int(len(out))
-        return out, before, after
+
+        if "_file_idx" not in df.columns:
+            # No file tagging — fall back to simple dedup (safe for single-file imports)
+            out = df.drop_duplicates(subset=key_cols, keep="first")
+            return out, before, int(len(out))
+
+        # Count occurrences of each key within each file, take the max across files.
+        grp = df.groupby(key_cols + ["_file_idx"], dropna=False).size().reset_index(name="_n")
+        max_per_group = grp.groupby(key_cols, dropna=False)["_n"].max().reset_index(name="_keep")
+
+        df2 = df.copy()
+        df2["_seq"] = df2.groupby(key_cols, dropna=False).cumcount()
+        merged = df2.merge(max_per_group, on=key_cols, how="left")
+        out = merged[merged["_seq"] < merged["_keep"]].drop(
+            columns=["_seq", "_keep", "_file_idx"], errors="ignore"
+        )
+        return out, before, int(len(out))
 
     main_df, main_before, main_after = _dedup(main_df)
     audit_df, audit_before, audit_after = _dedup(audit_df)
@@ -425,6 +456,30 @@ def calculate_portfolio(df, split_history=None):
                 qty -= sell_qty
                 cost = qty * avg_p
 
+            elif row["type"] == "COST_RESET":
+                # Atualização / patrimonial restatement: the FII's NAV was officially
+                # restated on this date.  The bank resets the cost basis to market value
+                # on the event date.  Fetch the historical close and apply the same logic.
+                if qty > 0:
+                    reset_price = fetch_historical_price(ticker, pd.Timestamp(row["date"]))
+                    if reset_price is not None:
+                        cost = qty * reset_price
+                        logger.debug(
+                            "COST_RESET for %s on %s: qty=%.0f price=%.4f new_cost=%.2f",
+                            ticker,
+                            row["date"],
+                            qty,
+                            reset_price,
+                            cost,
+                        )
+                    else:
+                        logger.warning(
+                            "COST_RESET for %s on %s: could not fetch historical price, "
+                            "cost basis unchanged.",
+                            ticker,
+                            row["date"],
+                        )
+
             elif row["type"] == "EARNINGS":
                 earnings += float(row.get("val", 0) or 0)
 
@@ -491,6 +546,35 @@ def fetch_split_history(tickers: tuple) -> dict:
     return result
 
 
+@st.cache_data(ttl=86400)
+def fetch_historical_price(ticker: str, date: pd.Timestamp) -> "float | None":
+    """Fetch the closing price of *ticker* on or near *date* from yfinance.
+
+    Used to determine cost-basis for Atualização (COST_RESET) events where
+    the B3 statement provides no price.  Returns None if unavailable.
+
+    Results are cached 24 h — historical prices don't change.
+    """
+    sa = f"{TICKER_REMAP[ticker]['new'] if ticker in TICKER_REMAP else ticker}.SA"
+    try:
+        # Fetch a small window around the event date (±7 calendar days)
+        start = (date - pd.Timedelta(days=7)).strftime("%Y-%m-%d")
+        end = (date + pd.Timedelta(days=7)).strftime("%Y-%m-%d")
+        hist = yf.Ticker(sa).history(start=start, end=end, auto_adjust=True)
+        if hist is None or hist.empty:
+            return None
+        hist.index = hist.index.tz_localize(None) if hist.index.tzinfo is not None else hist.index
+        # Pick the closest trading day on or before the event date
+        before = hist[hist.index <= date]
+        if not before.empty:
+            return float(before["Close"].iloc[-1])
+        # Fallback: first available day after the event date
+        return float(hist["Close"].iloc[0])
+    except Exception:
+        logger.debug("Could not fetch historical price for %s on %s.", sa, date)
+        return None
+
+
 @st.cache_data(ttl=3600)
 def fetch_market_prices(tickers):
     """Fetch latest prices for B3 tickers via yfinance (.SA suffix).
@@ -521,6 +605,37 @@ def fetch_market_prices(tickers):
     except Exception:
         logger.exception("yfinance batch download failed.")
     return prices
+
+
+# brapi.dev hosts free B3 company/fund logos keyed by the *current* ticker
+# code (e.g. PETR4.svg). It has no listing endpoint, so we probe with a
+# lightweight HEAD request per ticker and cache the (possibly-None) result
+# for a day — logos essentially never change and this keeps the Data Lab
+# tab fast after the first load.
+_LOGO_BASE_URL = "https://icons.brapi.dev/icons/{}.svg"
+
+
+@st.cache_data(ttl=86400)
+def fetch_asset_logos(tickers: tuple) -> dict:
+    """Resolve a logo URL for each ticker, or None if brapi has no icon for it.
+
+    Accepts a tuple (not list) so st.cache_data can hash the argument.
+    Renamed tickers (see TICKER_REMAP) are probed under their *new* code,
+    since that's what brapi indexes; discontinued funds and most FIIs
+    simply have no logo and resolve to None (handled gracefully by the
+    caller — no crash, no image shown).
+    """
+    logos: dict = {}
+    for ticker in tickers:
+        lookup = TICKER_REMAP[ticker]["new"] if ticker in TICKER_REMAP else ticker
+        url = _LOGO_BASE_URL.format(lookup)
+        try:
+            resp = requests.head(url, timeout=3, allow_redirects=True)
+            logos[ticker] = url if resp.status_code == 200 else None
+        except requests.RequestException:
+            logger.debug("Logo lookup failed for %s.", ticker)
+            logos[ticker] = None
+    return logos
 
 
 def analyze_position(

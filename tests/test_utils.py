@@ -273,6 +273,58 @@ def test_fetch_market_prices_returns_empty_for_no_tickers():
     assert utils.fetch_market_prices.__wrapped__([]) == {}
 
 
+def test_fetch_asset_logos_resolves_url_on_200(monkeypatch):
+    class FakeResponse:
+        status_code = 200
+
+    def fake_head(url, timeout=3, allow_redirects=True):
+        assert url == "https://icons.brapi.dev/icons/PETR4.svg"
+        return FakeResponse()
+
+    monkeypatch.setattr(utils.requests, "head", fake_head)
+
+    result = utils.fetch_asset_logos.__wrapped__(("PETR4",))
+    assert result == {"PETR4": "https://icons.brapi.dev/icons/PETR4.svg"}
+
+
+def test_fetch_asset_logos_none_on_404(monkeypatch):
+    class FakeResponse:
+        status_code = 404
+
+    monkeypatch.setattr(utils.requests, "head", lambda *a, **kw: FakeResponse())
+
+    result = utils.fetch_asset_logos.__wrapped__(("HGLG11",))
+    assert result == {"HGLG11": None}
+
+
+def test_fetch_asset_logos_none_on_request_error(monkeypatch):
+    def boom(*_args, **_kwargs):
+        raise utils.requests.RequestException("network down")
+
+    monkeypatch.setattr(utils.requests, "head", boom)
+
+    result = utils.fetch_asset_logos.__wrapped__(("PETR4",))
+    assert result == {"PETR4": None}
+
+
+def test_fetch_asset_logos_uses_remapped_ticker(monkeypatch):
+    captured_urls = []
+
+    class FakeResponse:
+        status_code = 200
+
+    def fake_head(url, timeout=3, allow_redirects=True):
+        captured_urls.append(url)
+        return FakeResponse()
+
+    monkeypatch.setattr(utils.requests, "head", fake_head)
+
+    # RVBI11 was renamed to PSEC11 (see TICKER_REMAP); brapi indexes the new code
+    result = utils.fetch_asset_logos.__wrapped__(("RVBI11",))
+    assert captured_urls == ["https://icons.brapi.dev/icons/PSEC11.svg"]
+    assert result == {"RVBI11": "https://icons.brapi.dev/icons/PSEC11.svg"}
+
+
 def test_load_and_process_movimentacao_routes_corporate_actions_to_main_df():
     df = pd.DataFrame(
         {
@@ -850,3 +902,118 @@ def test_analyze_position_current_price_in_result():
         asset_type="Ação",
     )
     assert result["current_price"] == pytest.approx(28.5)
+
+
+# ---------------------------------------------------------------------------
+# fetch_historical_price
+# ---------------------------------------------------------------------------
+
+def test_fetch_historical_price_returns_close_on_200(monkeypatch):
+    """Returns the closing price on or before the requested date."""
+    import pandas as pd
+
+    fake_hist = pd.DataFrame(
+        {"Close": [2.03]},
+        index=pd.DatetimeIndex([pd.Timestamp("2026-04-10")]),
+    )
+    fake_hist.index.name = "Date"
+
+    class FakeTicker:
+        def history(self, **_kw):
+            return fake_hist
+
+    monkeypatch.setattr(utils.yf, "Ticker", lambda _sa: FakeTicker())
+    result = utils.fetch_historical_price.__wrapped__("VIUR11", pd.Timestamp("2026-04-10"))
+    assert result == pytest.approx(2.03)
+
+
+def test_fetch_historical_price_returns_none_on_empty(monkeypatch):
+    """Returns None when yfinance returns no history."""
+    import pandas as pd
+
+    class FakeTicker:
+        def history(self, **_kw):
+            return pd.DataFrame()
+
+    monkeypatch.setattr(utils.yf, "Ticker", lambda _sa: FakeTicker())
+    result = utils.fetch_historical_price.__wrapped__("VIUR11", pd.Timestamp("2026-04-10"))
+    assert result is None
+
+
+def test_fetch_historical_price_returns_none_on_exception(monkeypatch):
+    """Returns None when yfinance raises."""
+    import pandas as pd
+
+    class FakeTicker:
+        def history(self, **_kw):
+            raise ConnectionError("network error")
+
+    monkeypatch.setattr(utils.yf, "Ticker", lambda _sa: FakeTicker())
+    result = utils.fetch_historical_price.__wrapped__("VIUR11", pd.Timestamp("2026-04-10"))
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# calculate_portfolio — COST_RESET event
+# ---------------------------------------------------------------------------
+
+def _make_mov_with_cost_reset() -> pd.DataFrame:
+    """MOV-style rows: BUY 361 shares pre-event, COST_RESET, BUY 3 more after."""
+    return pd.DataFrame(
+        {
+            "date": [
+                pd.Timestamp("2024-12-01"),
+                pd.Timestamp("2026-04-10"),
+                pd.Timestamp("2026-06-01"),
+            ],
+            "ticker": ["FNDX11"] * 3,
+            "type": ["BUY", "COST_RESET", "BUY"],
+            "qty": [361.0, 361.0, 3.0],
+            "val": [361 * 5.80, 0.0, 3 * 2.37],
+            "inst": ["BROKER"] * 3,
+            "source": ["NEG", "MOV", "NEG"],
+        }
+    )
+
+
+def test_calculate_portfolio_cost_reset_resets_cost_basis(monkeypatch):
+    """COST_RESET must reset cost = qty * historical_price, then subsequent buys add to it."""
+
+    reset_price = 2.03
+
+    monkeypatch.setattr(
+        utils,
+        "fetch_historical_price",
+        lambda ticker, date: reset_price,
+    )
+
+    df = _make_mov_with_cost_reset()
+    result = utils.calculate_portfolio(df)
+    row = result[result["ticker"] == "FNDX11"].iloc[0]
+
+    expected_cost = 361 * reset_price + 3 * 2.37
+    expected_qty = 364.0
+    expected_avg = expected_cost / expected_qty
+
+    assert row["qty"] == pytest.approx(expected_qty)
+    assert row["total_cost"] == pytest.approx(expected_cost, rel=1e-4)
+    assert row["avg_price"] == pytest.approx(expected_avg, rel=1e-4)
+
+
+def test_calculate_portfolio_cost_reset_unchanged_when_no_price(monkeypatch):
+    """If fetch_historical_price returns None, cost basis must remain unchanged."""
+
+    monkeypatch.setattr(
+        utils,
+        "fetch_historical_price",
+        lambda ticker, date: None,
+    )
+
+    df = _make_mov_with_cost_reset()
+    result = utils.calculate_portfolio(df)
+    row = result[result["ticker"] == "FNDX11"].iloc[0]
+
+    # Without a reset price, full purchase cost should accumulate normally
+    expected_cost = 361 * 5.80 + 3 * 2.37
+    assert row["qty"] == pytest.approx(364.0)
+    assert row["total_cost"] == pytest.approx(expected_cost, rel=1e-4)
