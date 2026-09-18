@@ -207,19 +207,25 @@ def load_and_process_files(uploaded_files):
                     "DIVIDENDO",
                     "JCP",
                     "JUROS SOBRE",
-                    "AMORTIZA",
                     "EMPRESTIMO",
                     "LEILAO DE FRACAO",
                     "REEMBOLSO",
                 ]
                 fee_terms = ["TAXA", "TARIFA", "IR", "IOF"]
-                transfer_terms = ["TRANSFER", "LIQUIDA"]
 
                 if any(t in m_upper for t in earn_terms):
                     return "EARNINGS"
+                # Amortização = return of capital: reduces cost basis, not income
+                if "AMORTIZA" in m_upper:
+                    return "AMORTIZATION"
                 if any(t in m_upper for t in fee_terms):
                     return "FEES"
-                if any(t in m_upper for t in transfer_terms):
+                # Plain inter-broker transfer (no settlement price) resets cost basis
+                # at the receiving broker.  "Transferência - Liquidação" is trade
+                # settlement already captured in the NEG file — leave it as TRANSFER.
+                if "TRANSFER" in m_upper and "LIQUIDA" not in m_upper:
+                    return "BROKER_TRANSFER"
+                if "TRANSFER" in m_upper or "LIQUIDA" in m_upper:
                     return "TRANSFER"
                 # reverse split: B3 records the new consolidated qty as a credit
                 if "GRUPAMENTO" in m_upper:
@@ -266,7 +272,10 @@ def load_and_process_files(uploaded_files):
 
             # corporate actions (splits, reverse splits, fractional debits) must flow into
             # main_df alongside earnings so calculate_portfolio can adjust share counts.
-            _main_types = {"EARNINGS", "SPLIT", "REVERSE_SPLIT", "SELL", "COST_RESET"}
+            _main_types = {
+                "EARNINGS", "SPLIT", "REVERSE_SPLIT", "SELL",
+                "COST_RESET", "AMORTIZATION", "BROKER_TRANSFER",
+            }
             temp_main = temp[temp["type"].isin(_main_types)].copy()
             temp_main["_file_idx"] = file_idx
             all_data.append(temp_main)
@@ -482,6 +491,37 @@ def calculate_portfolio(df, split_history=None):
 
             elif row["type"] == "EARNINGS":
                 earnings += float(row.get("val", 0) or 0)
+
+            elif row["type"] == "AMORTIZATION":
+                # Return of capital: the fund pays back part of invested principal.
+                # This reduces the cost basis by the amount paid (val is already
+                # positive from MOV credito sign; qty holds units at time of event).
+                if qty > 0:
+                    amort_val = abs(float(row.get("val", 0) or 0))
+                    cost = max(0.0, cost - amort_val)
+                    logger.debug(
+                        "AMORTIZATION for %s on %s: amount=%.2f new_cost=%.2f",
+                        ticker, row["date"], amort_val, cost,
+                    )
+
+            elif row["type"] == "BROKER_TRANSFER":
+                # Inter-broker transfer (plain "Transferência", no settlement price).
+                # The receiving broker resets cost basis to market value on transfer
+                # date.  Treat as COST_RESET: fetch D-1 close and reset cost.
+                if qty > 0 and str(row.get("val", "") or "").strip() in ("", "0", "nan", "0.0"):
+                    reset_price = fetch_historical_price(ticker, pd.Timestamp(row["date"]))
+                    if reset_price is not None:
+                        cost = qty * reset_price
+                        logger.debug(
+                            "BROKER_TRANSFER for %s on %s: qty=%.0f price=%.4f new_cost=%.2f",
+                            ticker, row["date"], qty, reset_price, cost,
+                        )
+                    else:
+                        logger.warning(
+                            "BROKER_TRANSFER for %s on %s: could not fetch price, "
+                            "cost basis unchanged.",
+                            ticker, row["date"],
+                        )
 
             elif row["type"] == "SPLIT":
                 if str(row.get("source", "")) == "yfinance_split":

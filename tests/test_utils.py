@@ -88,15 +88,16 @@ def test_load_and_process_movimentacao_applies_sign_and_classification():
 
     main_df, stats_df, audit_df = utils.load_and_process_files([_uploaded_file(df, "mov.xlsx")])
 
-    # Only earnings are kept in main
-    assert set(main_df["type"].unique()) == {"EARNINGS"}
-    assert main_df["val"].iloc[0] == 10.0
+    # Earnings and broker transfers are both kept in main
+    assert set(main_df["type"].unique()) == {"EARNINGS", "BROKER_TRANSFER"}
+    earnings_row = main_df[main_df["type"] == "EARNINGS"].iloc[0]
+    assert earnings_row["val"] == 10.0
 
     # qty is now extracted from the Quantidade column
-    assert main_df["qty"].iloc[0] == 148.0
+    assert earnings_row["qty"] == 148.0
 
-    # Fees/transfer go to audit; fee is negative due to Débito
-    assert set(audit_df["type"].unique()) == {"FEES", "TRANSFER"}
+    # Fees go to audit; broker transfers are kept in main now
+    assert set(audit_df["type"].unique()) == {"FEES"}
     fee_val = audit_df.loc[audit_df["type"] == "FEES", "val"].iloc[0]
     assert fee_val == -1.0
 
@@ -105,7 +106,7 @@ def test_load_and_process_movimentacao_applies_sign_and_classification():
     assert row["rows_total"] == 3
     assert row["rows_earnings"] == 1
     assert row["rows_fees"] == 1
-    assert row["rows_transfer"] == 1
+    assert row["rows_transfer"] == 0  # TRANSFERÊNCIA now classified as BROKER_TRANSFER in main
 
 
 def test_load_and_process_movimentacao_classifies_emprestimo_and_leilao():
@@ -1019,6 +1020,54 @@ def test_calculate_portfolio_cost_reset_resets_cost_basis(monkeypatch):
     assert row["qty"] == pytest.approx(expected_qty)
     assert row["total_cost"] == pytest.approx(expected_cost, rel=1e-4)
     assert row["avg_price"] == pytest.approx(expected_avg, rel=1e-4)
+
+
+def test_calculate_portfolio_amortization_reduces_cost():
+    """Amortização (return of capital) must reduce cost basis, not increase earnings."""
+    df = pd.DataFrame([
+        {"date": "2024-01-10", "ticker": "BDIV11", "type": "BUY",
+         "qty": 10.0, "val": 700.0, "source": "NEG", "desc": "Compra"},
+        {"date": "2024-06-15", "ticker": "BDIV11", "type": "AMORTIZATION",
+         "qty": 10.0, "val": 200.0, "source": "MOV", "desc": "Amortização"},
+    ])
+    result = utils.calculate_portfolio(df)
+    row = result[result["ticker"] == "BDIV11"].iloc[0]
+    assert row["qty"] == pytest.approx(10.0)
+    # cost should be 700 - 200 = 500; avg = 50
+    assert row["total_cost"] == pytest.approx(500.0, rel=1e-4)
+    assert row["avg_price"] == pytest.approx(50.0, rel=1e-4)
+
+
+def test_calculate_portfolio_broker_transfer_resets_cost(monkeypatch):
+    """BROKER_TRANSFER (plain Transferência) resets cost basis via D-1 close."""
+    monkeypatch.setattr(utils, "fetch_historical_price", lambda ticker, date: 38.45)
+
+    df = pd.DataFrame([
+        {"date": "2024-09-10", "ticker": "MFII11", "type": "BUY",
+         "qty": 23.0, "val": 2130.0, "source": "NEG", "desc": "Compra"},
+        {"date": "2026-09-11", "ticker": "MFII11", "type": "BROKER_TRANSFER",
+         "qty": 23.0, "val": 0.0, "source": "MOV", "desc": "Transferência"},
+    ])
+    result = utils.calculate_portfolio(df)
+    row = result[result["ticker"] == "MFII11"].iloc[0]
+    assert row["qty"] == pytest.approx(23.0)
+    assert row["avg_price"] == pytest.approx(38.45, rel=1e-4)
+
+
+def test_calculate_portfolio_broker_transfer_with_value_ignored(monkeypatch):
+    """BROKER_TRANSFER with a non-zero val (settlement row) must NOT reset cost."""
+    monkeypatch.setattr(utils, "fetch_historical_price", lambda ticker, date: 999.0)
+
+    df = pd.DataFrame([
+        {"date": "2024-09-10", "ticker": "MFII11", "type": "BUY",
+         "qty": 23.0, "val": 2130.0, "source": "NEG", "desc": "Compra"},
+        # val != 0 → skip the reset (this is a Transferência - Liquidação row)
+        {"date": "2024-09-11", "ticker": "MFII11", "type": "BROKER_TRANSFER",
+         "qty": 23.0, "val": 2300.0, "source": "MOV", "desc": "Transferência - Liquidação"},
+    ])
+    result = utils.calculate_portfolio(df)
+    row = result[result["ticker"] == "MFII11"].iloc[0]
+    assert row["total_cost"] == pytest.approx(2130.0, rel=1e-4)
 
 
 def test_calculate_portfolio_cost_reset_unchanged_when_no_price(monkeypatch):
