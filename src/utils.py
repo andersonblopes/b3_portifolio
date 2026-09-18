@@ -564,12 +564,19 @@ def fetch_historical_price(ticker: str, date: pd.Timestamp) -> "float | None":
         if hist is None or hist.empty:
             return None
         hist.index = hist.index.tz_localize(None) if hist.index.tzinfo is not None else hist.index
-        # Pick the closest trading day on or before the event date
-        before = hist[hist.index <= date]
+        # Use the last trading day BEFORE the event date (D-1 close).
+        # B3 corporate action reference prices (Atualização, splits, etc.) are
+        # calculated from D-1 close — the last market-settled value before the
+        # event takes effect.  This is consistent across FIIs, ETFs, stocks and FI.
+        before = hist[hist.index < date]
         if not before.empty:
             return float(before["Close"].iloc[-1])
-        # Fallback: first available day after the event date
-        return float(hist["Close"].iloc[0])
+        # Fallback: event day or first available day after (e.g. event on a Monday
+        # and no data for prior Friday in the window).
+        on_or_after = hist[hist.index >= date]
+        if not on_or_after.empty:
+            return float(on_or_after["Close"].iloc[0])
+        return float(hist["Close"].iloc[-1])
     except Exception:
         logger.debug("Could not fetch historical price for %s on %s.", sa, date)
         return None

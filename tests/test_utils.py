@@ -909,9 +909,30 @@ def test_analyze_position_current_price_in_result():
 # ---------------------------------------------------------------------------
 
 def test_fetch_historical_price_returns_close_on_200(monkeypatch):
-    """Returns the closing price on or before the requested date."""
+    """Returns the D-1 closing price (last trading day before the event date)."""
     import pandas as pd
 
+    # History has a row on Apr 9 (before event Apr 10) — should return that close
+    fake_hist = pd.DataFrame(
+        {"Close": [2.41]},
+        index=pd.DatetimeIndex([pd.Timestamp("2026-04-09")]),
+    )
+    fake_hist.index.name = "Date"
+
+    class FakeTicker:
+        def history(self, **_kw):
+            return fake_hist
+
+    monkeypatch.setattr(utils.yf, "Ticker", lambda _sa: FakeTicker())
+    result = utils.fetch_historical_price.__wrapped__("VIUR11", pd.Timestamp("2026-04-10"))
+    assert result == pytest.approx(2.41)
+
+
+def test_fetch_historical_price_falls_back_to_event_day_when_no_prior(monkeypatch):
+    """Falls back to event-day close when no prior trading day is in the window."""
+    import pandas as pd
+
+    # Only event day itself in history (e.g. event on a Monday, window too narrow)
     fake_hist = pd.DataFrame(
         {"Close": [2.03]},
         index=pd.DatetimeIndex([pd.Timestamp("2026-04-10")]),
