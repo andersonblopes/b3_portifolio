@@ -1,8 +1,7 @@
 import io
-import pytest
-from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 
 import src.utils as utils
 
@@ -192,10 +191,36 @@ def test_ticker_remap_maps_brit3_to_brst3():
     assert "note" in utils.TICKER_REMAP["BRIT3"]
 
 
+def test_calculate_portfolio_merges_renamed_ticker_positions():
+    # regression: a fund renamed mid-holding (old code buys + new code buys)
+    # must consolidate into ONE row keyed by the canonical (new) ticker,
+    # not fragment into two separate positions.
+    old_code, new_code = next(iter(utils.TICKER_REMAP.items()))
+    new_code = new_code["new"]
+
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2024-01-01", "2024-06-01"]),
+            "ticker": [old_code, new_code],
+            "type": ["BUY", "BUY"],
+            "qty": [10.0, 5.0],
+            "val": [100.0, 60.0],
+        }
+    )
+
+    out = utils.calculate_portfolio(df)
+
+    # only one row should exist for this holding, under the canonical ticker
+    assert list(out["ticker"]) == [new_code]
+    row = out.iloc[0]
+    assert row["qty"] == pytest.approx(15.0)
+    assert row["total_cost"] == pytest.approx(160.0)
+
+
 def test_discontinued_tickers_is_dict_with_reasons():
     assert isinstance(utils.DISCONTINUED_TICKERS, dict)
     # every entry must have a non-empty reason string
-    for ticker, reason in utils.DISCONTINUED_TICKERS.items():
+    for _ticker, reason in utils.DISCONTINUED_TICKERS.items():
         assert isinstance(reason, str) and reason
 
 
@@ -220,15 +245,11 @@ def test_get_exchange_rate_fallback_on_yfinance_error(monkeypatch):
 
 
 def test_fetch_market_prices_uses_yfinance_response(monkeypatch):
+
     import pandas as pd
-    from unittest.mock import MagicMock
 
     # multi-ticker return: top-level keys are ticker symbols
-    close_petr4 = pd.Series([38.50], name="Close")
-    close_vale3 = pd.Series([65.10], name="Close")
-    data = pd.DataFrame(
-        {("PETR4.SA", "Close"): [38.50], ("VALE3.SA", "Close"): [65.10]}
-    )
+    data = pd.DataFrame({("PETR4.SA", "Close"): [38.50], ("VALE3.SA", "Close"): [65.10]})
     data.columns = pd.MultiIndex.from_tuples(data.columns)
 
     monkeypatch.setattr(utils.yf, "download", lambda *a, **kw: data)
@@ -260,7 +281,12 @@ def test_load_and_process_movimentacao_routes_corporate_actions_to_main_df():
             "Instituição": ["XP", "XP", "XP", "XP"],
             "Quantidade": [4.8, 0.0, 0.8, 0.2],
             "Valor da Operação": [0.0, 5.0, 0.0, 0.0],
-            "Movimentação": ["Grupamento", "Dividendo", "Fração em Ativos", "Bonificação em Ativos"],
+            "Movimentação": [
+                "Grupamento",
+                "Dividendo",
+                "Fração em Ativos",
+                "Bonificação em Ativos",
+            ],
             "Entrada/Saída": ["Credito", "Credito", "Debito", "Credito"],
         }
     )
@@ -324,13 +350,15 @@ def test_calculate_portfolio_full_mglu3_corporate_action_sequence():
     # fractional sell 0.8, bonificação adds 0.2, fractional sell 0.2
     df = pd.DataFrame(
         {
-            "date": pd.to_datetime([
-                "2024-05-24",  # buy 48 @ 1.36
-                "2024-05-28",  # grupamento → 4.8
-                "2024-05-31",  # fração em ativos sell 0.8
-                "2026-01-02",  # bonificação +0.2
-                "2026-02-09",  # fração em ativos sell 0.2
-            ]),
+            "date": pd.to_datetime(
+                [
+                    "2024-05-24",  # buy 48 @ 1.36
+                    "2024-05-28",  # grupamento → 4.8
+                    "2024-05-31",  # fração em ativos sell 0.8
+                    "2026-01-02",  # bonificação +0.2
+                    "2026-02-09",  # fração em ativos sell 0.2
+                ]
+            ),
             "ticker": ["MGLU3"] * 5,
             "type": ["BUY", "REVERSE_SPLIT", "SELL", "SPLIT", "SELL"],
             "qty": [48.0, 4.8, 0.8, 0.2, 0.2],
@@ -400,7 +428,7 @@ def test_calculate_portfolio_uses_yfinance_splits_when_no_mov(monkeypatch):
 
     split_history = {
         "MGLU3": [
-            {"date": pd.Timestamp("2024-05-27"), "ratio": 0.1},   # grupamento 10:1
+            {"date": pd.Timestamp("2024-05-27"), "ratio": 0.1},  # grupamento 10:1
             {"date": pd.Timestamp("2025-12-30"), "ratio": 1.05},  # bonificação 5%
         ]
     }
@@ -429,9 +457,7 @@ def test_calculate_portfolio_yfinance_splits_not_applied_when_mov_exists():
     )
 
     # even if split_history is provided, it must not be applied because MOV data exists
-    split_history = {
-        "MGLU3": [{"date": pd.Timestamp("2024-05-27"), "ratio": 0.1}]
-    }
+    split_history = {"MGLU3": [{"date": pd.Timestamp("2024-05-27"), "ratio": 0.1}]}
 
     out = utils.calculate_portfolio(df, split_history=split_history)
     row = out[out["ticker"] == "MGLU3"].iloc[0]
@@ -442,9 +468,26 @@ def test_calculate_portfolio_yfinance_splits_not_applied_when_mov_exists():
 
 # --- analyze_position ---
 
+
 def test_analyze_position_returns_none_for_invalid_inputs():
-    assert utils.analyze_position("X3", qty=0, avg_price=10, total_cost=0, current_price=10, earnings=0, asset_type="Ação") is None
-    assert utils.analyze_position("X3", qty=10, avg_price=10, total_cost=100, current_price=0, earnings=0, asset_type="Ação") is None
+    assert (
+        utils.analyze_position(
+            "X3", qty=0, avg_price=10, total_cost=0, current_price=10, earnings=0, asset_type="Ação"
+        )
+        is None
+    )
+    assert (
+        utils.analyze_position(
+            "X3",
+            qty=10,
+            avg_price=10,
+            total_cost=100,
+            current_price=0,
+            earnings=0,
+            asset_type="Ação",
+        )
+        is None
+    )
 
 
 def test_analyze_position_gain_scenario_basic():
@@ -459,14 +502,14 @@ def test_analyze_position_gain_scenario_basic():
         asset_type="Ação",
     )
     assert result is not None
-    assert result['scenario'] == 'gain'
-    assert result['yield_pct'] == pytest.approx(30.0)
+    assert result["scenario"] == "gain"
+    assert result["yield_pct"] == pytest.approx(30.0)
     # breakeven equals avg_price when earnings=0
-    assert result['breakeven'] == pytest.approx(10.0)
+    assert result["breakeven"] == pytest.approx(10.0)
     # trailing stop: 15% below current = 13 * 0.85 = 11.05; above breakeven so kept
-    assert result['trailing_stop'] == pytest.approx(13.0 * 0.85, abs=0.01)
+    assert result["trailing_stop"] == pytest.approx(13.0 * 0.85, abs=0.01)
     # targets: +20% and +50% are above current (13.0 * 1.2 = 12 < 13 → only +50% and 2× remain)
-    prices_above_current = [t['price'] for t in result['targets']]
+    prices_above_current = [t["price"] for t in result["targets"]]
     for p in prices_above_current:
         assert p > 13.0
 
@@ -481,15 +524,15 @@ def test_analyze_position_gain_targets_content():
         earnings=0.0,
         asset_type="Ação",
     )
-    labels = [t['label'] for t in result['targets']]
-    assert 'target_20pct' in labels   # 50 * 1.20 = 60 > 55
-    assert 'target_50pct' in labels   # 50 * 1.50 = 75 > 55
-    assert 'target_double' in labels  # 50 * 2.00 = 100 > 55
+    labels = [t["label"] for t in result["targets"]]
+    assert "target_20pct" in labels  # 50 * 1.20 = 60 > 55
+    assert "target_50pct" in labels  # 50 * 1.50 = 75 > 55
+    assert "target_double" in labels  # 50 * 2.00 = 100 > 55
     # sell quantities follow the fractions: 25%, 33%, 50% of qty=200
-    qty_map = {t['label']: t['qty_to_sell'] for t in result['targets']}
-    assert qty_map['target_20pct'] == 50    # 200 * 0.25
-    assert qty_map['target_50pct'] == 66    # 200 * 0.33 rounded
-    assert qty_map['target_double'] == 100  # 200 * 0.50
+    qty_map = {t["label"]: t["qty_to_sell"] for t in result["targets"]}
+    assert qty_map["target_20pct"] == 50  # 200 * 0.25
+    assert qty_map["target_50pct"] == 66  # 200 * 0.33 rounded
+    assert qty_map["target_double"] == 100  # 200 * 0.50
 
 
 def test_analyze_position_all_targets_surpassed():
@@ -503,8 +546,8 @@ def test_analyze_position_all_targets_surpassed():
         earnings=0.0,
         asset_type="Ação",
     )
-    assert result['targets'] == []
-    assert 'note_high_gain' in result['notes']
+    assert result["targets"] == []
+    assert "note_high_gain" in result["notes"]
 
 
 def test_analyze_position_loss_scenario_dca():
@@ -518,16 +561,16 @@ def test_analyze_position_loss_scenario_dca():
         earnings=0.0,
         asset_type="Ação",
     )
-    assert result['scenario'] == 'loss'
-    assert result['yield_pct'] == pytest.approx(-40.0)
-    assert 'note_deep_loss' in result['notes']
-    assert len(result['dca']) > 0
+    assert result["scenario"] == "loss"
+    assert result["yield_pct"] == pytest.approx(-40.0)
+    assert "note_deep_loss" in result["notes"]
+    assert len(result["dca"]) > 0
     # verify DCA formula: for midpoint target = (20+12)/2 = 16
     # add_qty = (2000 - 16*100) / (16 - 12) = (2000-1600)/4 = 100
-    midpoint_dca = next(d for d in result['dca'] if d['label'] == 'dca_50pct_recovery')
-    assert midpoint_dca['add_qty'] == pytest.approx(100.0, abs=0.5)
+    midpoint_dca = next(d for d in result["dca"] if d["label"] == "dca_50pct_recovery")
+    assert midpoint_dca["add_qty"] == pytest.approx(100.0, abs=0.5)
     # new_avg after buying 100 more at 12: (2000 + 100*12) / 200 = 3200/200 = 16
-    assert midpoint_dca['new_avg'] == pytest.approx(16.0, abs=0.05)
+    assert midpoint_dca["new_avg"] == pytest.approx(16.0, abs=0.05)
 
 
 def test_analyze_position_flat_scenario():
@@ -541,7 +584,7 @@ def test_analyze_position_flat_scenario():
         earnings=0.0,
         asset_type="Ação",
     )
-    assert result['scenario'] == 'flat'
+    assert result["scenario"] == "flat"
 
 
 def test_analyze_position_fii_trailing_stop_8pct():
@@ -555,7 +598,7 @@ def test_analyze_position_fii_trailing_stop_8pct():
         asset_type="FII/ETF",
     )
     # FII uses 8% trail: 120 * 0.92 = 110.4; above breakeven (100), so kept
-    assert result['trailing_stop'] == pytest.approx(120.0 * 0.92, abs=0.01)
+    assert result["trailing_stop"] == pytest.approx(120.0 * 0.92, abs=0.01)
 
 
 def test_analyze_position_bdr_trailing_stop_12pct():
@@ -569,7 +612,7 @@ def test_analyze_position_bdr_trailing_stop_12pct():
         asset_type="BDR",
     )
     # BDR uses 12% trail: 500 * 0.88 = 440; above breakeven (400), so kept
-    assert result['trailing_stop'] == pytest.approx(500.0 * 0.88, abs=0.01)
+    assert result["trailing_stop"] == pytest.approx(500.0 * 0.88, abs=0.01)
 
 
 def test_analyze_position_trailing_stop_floored_at_breakeven():
@@ -579,11 +622,11 @@ def test_analyze_position_trailing_stop_floored_at_breakeven():
         qty=100,
         avg_price=10.0,
         total_cost=1000.0,
-        current_price=10.5,    # only +5%; 15% trail = 8.925 < breakeven 10.0
+        current_price=10.5,  # only +5%; 15% trail = 8.925 < breakeven 10.0
         earnings=0.0,
         asset_type="Ação",
     )
-    assert result['trailing_stop'] == pytest.approx(10.0, abs=0.01)
+    assert result["trailing_stop"] == pytest.approx(10.0, abs=0.01)
 
 
 def test_analyze_position_earnings_reduce_breakeven():
@@ -597,8 +640,8 @@ def test_analyze_position_earnings_reduce_breakeven():
         earnings=200.0,
         asset_type="Ação",
     )
-    assert result['breakeven'] == pytest.approx(8.0)
-    assert 'note_earnings_offset' in result['notes']
+    assert result["breakeven"] == pytest.approx(8.0)
+    assert "note_earnings_offset" in result["notes"]
 
 
 def test_analyze_position_dca_top_up_only_when_yield_below_20():
@@ -612,9 +655,9 @@ def test_analyze_position_dca_top_up_only_when_yield_below_20():
         earnings=0.0,
         asset_type="Ação",
     )
-    assert result_low['dca'] is not None
-    assert len(result_low['dca']) > 0
-    assert result_low['dca'][0]['label'] == 'dca_topup'
+    assert result_low["dca"] is not None
+    assert len(result_low["dca"]) > 0
+    assert result_low["dca"][0]["label"] == "dca_topup"
 
     # 25% gain — above threshold, no DCA suggested
     result_high = utils.analyze_position(
@@ -626,129 +669,184 @@ def test_analyze_position_dca_top_up_only_when_yield_below_20():
         earnings=0.0,
         asset_type="Ação",
     )
-    assert result_high['dca'] == [] or result_high['dca'] is None
+    assert result_high["dca"] == [] or result_high["dca"] is None
 
 
 # --- recommendation engine ---
 
+
 def test_analyze_position_has_recommendation_field():
     result = utils.analyze_position(
-        ticker="PETR4", qty=100, avg_price=30.0, total_cost=3000.0,
-        current_price=32.0, earnings=0.0, asset_type="Ação",
+        ticker="PETR4",
+        qty=100,
+        avg_price=30.0,
+        total_cost=3000.0,
+        current_price=32.0,
+        earnings=0.0,
+        asset_type="Ação",
     )
-    assert 'recommendation' in result
-    assert result['recommendation'] in ('exit', 'trim', 'hold', 'dca')
+    assert "recommendation" in result
+    assert result["recommendation"] in ("exit", "trim", "hold", "dca")
 
 
 def test_analyze_position_exit_when_below_stop():
     # price just above avg but below the trailing stop floor at breakeven
     # avg=30, earnings=0, breakeven=30, current=25 (below stop)
     result = utils.analyze_position(
-        ticker="PETR4", qty=100, avg_price=30.0, total_cost=3000.0,
-        current_price=25.0, earnings=0.0, asset_type="Ação",
+        ticker="PETR4",
+        qty=100,
+        avg_price=30.0,
+        total_cost=3000.0,
+        current_price=25.0,
+        earnings=0.0,
+        asset_type="Ação",
     )
-    assert result['price_below_stop'] is True
-    assert result['recommendation'] == 'exit'
+    assert result["price_below_stop"] is True
+    assert result["recommendation"] == "exit"
 
 
 def test_analyze_position_hold_overrides_exit_when_high_dividend():
     # price below stop but yield-on-cost >= 8% — dividend cushion keeps the hold
     result = utils.analyze_position(
-        ticker="BBAS3", qty=100, avg_price=30.0, total_cost=3000.0,
-        current_price=25.0, earnings=300.0, asset_type="Ação",
+        ticker="BBAS3",
+        qty=100,
+        avg_price=30.0,
+        total_cost=3000.0,
+        current_price=25.0,
+        earnings=300.0,
+        asset_type="Ação",
     )
     # earnings/total_cost = 10% >= 8% → dividend override
-    assert result['yield_on_cost'] >= 8.0
-    assert result['price_below_stop'] is True
-    assert result['recommendation'] == 'hold'
+    assert result["yield_on_cost"] >= 8.0
+    assert result["price_below_stop"] is True
+    assert result["recommendation"] == "hold"
 
 
 def test_analyze_position_trim_at_50pct_gain():
     result = utils.analyze_position(
-        ticker="VALE3", qty=100, avg_price=20.0, total_cost=2000.0,
-        current_price=32.0, earnings=0.0, asset_type="Ação",
+        ticker="VALE3",
+        qty=100,
+        avg_price=20.0,
+        total_cost=2000.0,
+        current_price=32.0,
+        earnings=0.0,
+        asset_type="Ação",
     )
-    assert result['yield_pct'] >= 50
-    assert result['recommendation'] == 'trim'
+    assert result["yield_pct"] >= 50
+    assert result["recommendation"] == "trim"
 
 
 def test_analyze_position_hold_for_moderate_gain():
     # +10% gain, no stop triggered — should be hold
     result = utils.analyze_position(
-        ticker="VALE3", qty=100, avg_price=20.0, total_cost=2000.0,
-        current_price=22.0, earnings=0.0, asset_type="Ação",
+        ticker="VALE3",
+        qty=100,
+        avg_price=20.0,
+        total_cost=2000.0,
+        current_price=22.0,
+        earnings=0.0,
+        asset_type="Ação",
     )
-    assert result['scenario'] in ('gain', 'flat')
-    assert result['recommendation'] == 'hold'
+    assert result["scenario"] in ("gain", "flat")
+    assert result["recommendation"] == "hold"
 
 
 def test_analyze_position_dca_recommended_on_loss():
     # 5% loss; earnings reduce breakeven below current_price so stop is not triggered;
     # yield-on-cost is 6% (< 8%) so no dividend cushion → lands on DCA
     result = utils.analyze_position(
-        ticker="MGLU3", qty=100, avg_price=10.0, total_cost=1000.0,
-        current_price=9.5, earnings=60.0, asset_type="Ação",
+        ticker="MGLU3",
+        qty=100,
+        avg_price=10.0,
+        total_cost=1000.0,
+        current_price=9.5,
+        earnings=60.0,
+        asset_type="Ação",
         portfolio_total_value=500_000.0,
     )
-    assert result['scenario'] == 'loss'
-    assert result['price_below_stop'] is False
-    assert result['yield_on_cost'] < 8.0
-    assert result['recommendation'] == 'dca'
-    assert any(not d['concentration_risk'] for d in result['dca'])
+    assert result["scenario"] == "loss"
+    assert result["price_below_stop"] is False
+    assert result["yield_on_cost"] < 8.0
+    assert result["recommendation"] == "dca"
+    assert any(not d["concentration_risk"] for d in result["dca"])
 
 
 def test_analyze_position_dca_blocked_by_concentration():
     # same small-loss scenario but tiny portfolio forces every DCA above 10% weight
     result = utils.analyze_position(
-        ticker="MGLU3", qty=100, avg_price=10.0, total_cost=1000.0,
-        current_price=9.5, earnings=60.0, asset_type="Ação",
-        portfolio_total_value=2000.0,   # mkt_value=950 already 47.5%; any DCA → > 10%
+        ticker="MGLU3",
+        qty=100,
+        avg_price=10.0,
+        total_cost=1000.0,
+        current_price=9.5,
+        earnings=60.0,
+        asset_type="Ação",
+        portfolio_total_value=2000.0,  # mkt_value=950 already 47.5%; any DCA → > 10%
     )
-    assert result['scenario'] == 'loss'
-    assert result['price_below_stop'] is False
-    assert result['dca']
-    all_blocked = all(d['concentration_risk'] for d in result['dca'])
+    assert result["scenario"] == "loss"
+    assert result["price_below_stop"] is False
+    assert result["dca"]
+    all_blocked = all(d["concentration_risk"] for d in result["dca"])
     assert all_blocked
-    assert result['recommendation'] == 'hold'
+    assert result["recommendation"] == "hold"
 
 
 def test_analyze_position_concentration_risk_flag_per_dca_entry():
     # with a very small portfolio, any additional purchase should flag concentration
     result = utils.analyze_position(
-        ticker="MGLU3", qty=500, avg_price=20.0, total_cost=10000.0,
-        current_price=15.0, earnings=0.0, asset_type="Ação",
+        ticker="MGLU3",
+        qty=500,
+        avg_price=20.0,
+        total_cost=10000.0,
+        current_price=15.0,
+        earnings=0.0,
+        asset_type="Ação",
         portfolio_total_value=20_000.0,
     )
-    for d in result['dca']:
-        assert 'concentration_risk' in d
-        assert 'new_weight' in d
-        assert isinstance(d['concentration_risk'], bool)
-        assert isinstance(d['new_weight'], float)
+    for d in result["dca"]:
+        assert "concentration_risk" in d
+        assert "new_weight" in d
+        assert isinstance(d["concentration_risk"], bool)
+        assert isinstance(d["new_weight"], float)
 
 
 def test_analyze_position_yield_on_cost_calculated():
     result = utils.analyze_position(
-        ticker="BBSE3", qty=100, avg_price=30.0, total_cost=3000.0,
-        current_price=32.0, earnings=240.0, asset_type="Ação",
+        ticker="BBSE3",
+        qty=100,
+        avg_price=30.0,
+        total_cost=3000.0,
+        current_price=32.0,
+        earnings=240.0,
+        asset_type="Ação",
     )
     # 240 / 3000 * 100 = 8.0
-    assert result['yield_on_cost'] == pytest.approx(8.0)
+    assert result["yield_on_cost"] == pytest.approx(8.0)
 
 
 def test_analyze_position_current_weight_calculated():
     result = utils.analyze_position(
-        ticker="BBSE3", qty=100, avg_price=30.0, total_cost=3000.0,
-        current_price=40.0, earnings=0.0, asset_type="Ação",
+        ticker="BBSE3",
+        qty=100,
+        avg_price=30.0,
+        total_cost=3000.0,
+        current_price=40.0,
+        earnings=0.0,
+        asset_type="Ação",
         portfolio_total_value=40_000.0,
     )
     # mkt_value = 4000, portfolio = 40000 → weight = 10%
-    assert result['current_weight'] == pytest.approx(10.0)
+    assert result["current_weight"] == pytest.approx(10.0)
 
 
 def test_analyze_position_current_price_in_result():
     result = utils.analyze_position(
-        ticker="PETR4", qty=100, avg_price=30.0, total_cost=3000.0,
-        current_price=28.5, earnings=0.0, asset_type="Ação",
+        ticker="PETR4",
+        qty=100,
+        avg_price=30.0,
+        total_cost=3000.0,
+        current_price=28.5,
+        earnings=0.0,
+        asset_type="Ação",
     )
-    assert result['current_price'] == pytest.approx(28.5)
-
+    assert result["current_price"] == pytest.approx(28.5)

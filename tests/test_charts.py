@@ -29,7 +29,9 @@ def test_plot_earnings_evolution_tickprefix():
 
 def test_plot_bar_earnings_horizontal_limits_to_10_and_is_horizontal():
     df = pd.DataFrame({"name": [f"a{i}" for i in range(20)], "val": list(range(20))})
-    fig = charts.plot_bar_earnings_horizontal(df, x_label="name", y_value="val", sym="R$", is_usd=False, title="t")
+    fig = charts.plot_bar_earnings_horizontal(
+        df, x_label="name", y_value="val", sym="R$", is_usd=False, title="t"
+    )
     assert isinstance(fig, go.Figure)
     assert fig.data[0].orientation == "h"
     # x is values, y is labels

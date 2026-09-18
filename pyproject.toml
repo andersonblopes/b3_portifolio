@@ -6,6 +6,8 @@ skip-string-normalization = false
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+
+[tool.ruff.lint]
 # Keep it pragmatic: catch real bugs + enforce clean imports
 select = [
   "E",   # pycodestyle errors
@@ -17,6 +19,11 @@ select = [
 ignore = [
   # Streamlit apps often use top-level imports/side effects; keep noise low initially.
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# i18n string dict: long translated UI copy is expected and splitting it
+# hurts readability/diffability far more than it helps.
+"src/langs.py" = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]

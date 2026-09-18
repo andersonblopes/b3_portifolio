@@ -1,8 +1,7 @@
 import logging
-import os
 import re
-import warnings
 import unicodedata
+import warnings
 
 import pandas as pd
 import streamlit as st
@@ -16,11 +15,8 @@ def _norm(s: object) -> str:
     if s is None:
         return ""
     txt = str(s).strip().upper()
-    return (
-        unicodedata.normalize("NFKD", txt)
-        .encode("ascii", "ignore")
-        .decode("ascii")
-    )
+    return unicodedata.normalize("NFKD", txt).encode("ascii", "ignore").decode("ascii")
+
 
 # Some B3 exports trigger this common openpyxl warning; keep other warnings visible.
 warnings.filterwarnings(
@@ -35,7 +31,10 @@ warnings.filterwarnings(
 #   "new"  — the current active ticker on Yahoo Finance
 #   "note" — human-readable explanation shown in the Ticker Changes tab
 TICKER_REMAP: dict[str, dict] = {
-    "BRIT3":  {"new": "BRST3",  "note": "Renamed after incorporation by Brisanet Serviços (Nov 2024)"},
+    "BRIT3": {
+        "new": "BRST3",
+        "note": "Renamed after incorporation by Brisanet Serviços (Nov 2024)",
+    },
     "CVBI11": {"new": "PCIP11", "note": "Fund renamed on B3 (Sep 2025)"},
     "MALL11": {"new": "PMLL11", "note": "Fund renamed on B3 (Jul 2025)"},
     "RVBI11": {"new": "PSEC11", "note": "Fund renamed on B3 (Oct 2025)"},
@@ -46,6 +45,9 @@ TICKER_REMAP: dict[str, dict] = {
 # maps ticker → reason string shown in the Ticker Changes tab.
 DISCONTINUED_TICKERS: dict[str, str] = {
     "LSPA11": "Leste Riva Equity — fund in wind-down, last trade Dec 2024",
+    "IRDM11": "Iridium Recebíveis Imobiliários — merged into IRIM11, delisted Oct 2025",
+    "IRIM15": "Iridium-related code (subscription right/debenture) — no Yahoo Finance data",
+    "SNEL13": "Debenture-style code — no Yahoo Finance data",
 }
 
 
@@ -89,13 +91,13 @@ def clean_ticker(text):
 
 def detect_asset_type(ticker):
     t = str(ticker).upper()
-    if t.endswith('11'):
-        return 'FII/ETF'
-    elif any(t.endswith(s) for s in ['34', '31', '33']):
-        return 'BDR'
-    elif any(t.endswith(s) for s in ['3', '4', '5', '6', '7', '8', '2']):
-        return 'Ação'
-    return 'Outro'
+    if t.endswith("11"):
+        return "FII/ETF"
+    elif any(t.endswith(s) for s in ["34", "31", "33"]):
+        return "BDR"
+    elif any(t.endswith(s) for s in ["3", "4", "5", "6", "7", "8", "2"]):
+        return "Ação"
+    return "Outro"
 
 
 def load_and_process_files(uploaded_files):
@@ -111,137 +113,184 @@ def load_and_process_files(uploaded_files):
     stats_rows = []
     audit_rows = []
 
+    logger.info("Starting import of %d file(s).", len(uploaded_files))
+
     for file in uploaded_files:
         file_name = getattr(file, "name", "uploaded.xlsx")
-        df = pd.read_excel(file)
+        logger.info("Processing file: %s", file_name)
+        try:
+            df = pd.read_excel(file)
+        except Exception:
+            logger.exception("Failed to read file %s. Skipping.", file_name)
+            continue
+        logger.debug("File %s: %d rows, columns=%s", file_name, len(df), list(df.columns))
 
         # --- Trading / Negotiation statement ---
-        if 'Data do Negócio' in df.columns:
+        if "Data do Negócio" in df.columns:
             temp = pd.DataFrame()
-            temp['date'] = pd.to_datetime(df['Data do Negócio'], dayfirst=True, errors='coerce')
-            temp['ticker'] = df['Código de Negociação'].apply(clean_ticker)
-            temp['qty'] = pd.to_numeric(df['Quantidade'], errors='coerce').fillna(0)
-            temp['val'] = pd.to_numeric(df['Valor'], errors='coerce').fillna(0)
-            temp['inst'] = df['Instituição'].fillna('Desconhecida')
+            temp["date"] = pd.to_datetime(df["Data do Negócio"], dayfirst=True, errors="coerce")
+            temp["ticker"] = df["Código de Negociação"].apply(clean_ticker)
+            temp["qty"] = pd.to_numeric(df["Quantidade"], errors="coerce").fillna(0)
+            temp["val"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
+            temp["inst"] = df["Instituição"].fillna("Desconhecida")
 
             # Explicit mapping to avoid treating unknown types as SELL.
-            movement = df['Tipo de Movimentação'].astype(str).str.upper()
-            temp['type'] = 'IGNORE'
-            temp.loc[movement.str.contains('COMPRA', na=False), 'type'] = 'BUY'
-            temp.loc[movement.str.contains('VENDA', na=False), 'type'] = 'SELL'
+            movement = df["Tipo de Movimentação"].astype(str).str.upper()
+            temp["type"] = "IGNORE"
+            temp.loc[movement.str.contains("COMPRA", na=False), "type"] = "BUY"
+            temp.loc[movement.str.contains("VENDA", na=False), "type"] = "SELL"
 
-            temp['source'] = 'NEG'
-            temp['desc'] = df['Tipo de Movimentação'].astype(str)
+            temp["source"] = "NEG"
+            temp["desc"] = df["Tipo de Movimentação"].astype(str)
 
             stats_rows.append(
                 {
-                    'file': file_name,
-                    'detected': 'NEG',
-                    'rows_total': int(len(temp)),
-                    'rows_buy': int((temp['type'] == 'BUY').sum()),
-                    'rows_sell': int((temp['type'] == 'SELL').sum()),
-                    'rows_earnings': 0,
-                    'rows_fees': 0,
-                    'rows_transfer': 0,
-                    'rows_ignored': int((temp['type'] == 'IGNORE').sum()),
+                    "file": file_name,
+                    "detected": "NEG",
+                    "rows_total": int(len(temp)),
+                    "rows_buy": int((temp["type"] == "BUY").sum()),
+                    "rows_sell": int((temp["type"] == "SELL").sum()),
+                    "rows_earnings": 0,
+                    "rows_fees": 0,
+                    "rows_transfer": 0,
+                    "rows_ignored": int((temp["type"] == "IGNORE").sum()),
                 }
             )
 
-            audit_rows.append(temp[temp['type'] == 'IGNORE'])
-            all_data.append(temp[temp['type'] != 'IGNORE'])
+            audit_rows.append(temp[temp["type"] == "IGNORE"])
+            all_data.append(temp[temp["type"] != "IGNORE"])
+            logger.info(
+                "File %s: detected NEG statement — total=%d buy=%d sell=%d ignored=%d",
+                file_name,
+                len(temp),
+                int((temp["type"] == "BUY").sum()),
+                int((temp["type"] == "SELL").sum()),
+                int((temp["type"] == "IGNORE").sum()),
+            )
             continue
 
         # --- Movements statement ---
-        if 'Data' not in df.columns:
+        if "Data" not in df.columns:
             # Some exports have a header offset; try to detect the row that contains "Data".
             for i, row in df.iterrows():
-                if 'Data' in [str(v) for v in row.values]:
+                if "Data" in [str(v) for v in row.values]:
                     df.columns = df.iloc[i]
-                    df = df.iloc[i + 1:].reset_index(drop=True)
+                    df = df.iloc[i + 1 :].reset_index(drop=True)
                     break
 
-        if 'Movimentação' in df.columns:
+        if "Movimentação" in df.columns:
             temp = pd.DataFrame()
-            temp['date'] = pd.to_datetime(df['Data'], dayfirst=True, errors='coerce')
-            temp['ticker'] = df['Produto'].apply(clean_ticker)
-            temp['inst'] = df['Instituição'].fillna('Desconhecida')
+            temp["date"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
+            temp["ticker"] = df["Produto"].apply(clean_ticker)
+            temp["inst"] = df["Instituição"].fillna("Desconhecida")
 
             # Apply sign based on Entrada/Saída (Credito/Debito) when available.
             sign = 1
-            if 'Entrada/Saída' in df.columns:
-                es = df['Entrada/Saída'].map(_norm)
+            if "Entrada/Saída" in df.columns:
+                es = df["Entrada/Saída"].map(_norm)
                 # Handles "Débito" / "Debito" / "DEBIT" variations
-                sign = es.map(lambda x: -1 if 'DEB' in x else 1).fillna(1)
+                sign = es.map(lambda x: -1 if "DEB" in x else 1).fillna(1)
 
-            temp['val'] = pd.to_numeric(df['Valor da Operação'], errors='coerce').fillna(0) * sign
-            qty_col = df['Quantidade'] if 'Quantidade' in df.columns else 0
-            temp['qty'] = pd.to_numeric(qty_col, errors='coerce').fillna(0)
-            temp['desc'] = df['Movimentação'].astype(str)
+            temp["val"] = pd.to_numeric(df["Valor da Operação"], errors="coerce").fillna(0) * sign
+            qty_col = df["Quantidade"] if "Quantidade" in df.columns else 0
+            temp["qty"] = pd.to_numeric(qty_col, errors="coerce").fillna(0)
+            temp["desc"] = df["Movimentação"].astype(str)
 
             def map_mov(m):
                 m_upper = _norm(m)
 
-                earn_terms = ['RENDIMENTO', 'DIVIDENDO', 'JCP', 'JUROS SOBRE', 'AMORTIZA',
-                              'EMPRESTIMO', 'LEILAO DE FRACAO', 'REEMBOLSO']
-                fee_terms = ['TAXA', 'TARIFA', 'IR', 'IOF']
-                transfer_terms = ['TRANSFER', 'LIQUIDA']
+                earn_terms = [
+                    "RENDIMENTO",
+                    "DIVIDENDO",
+                    "JCP",
+                    "JUROS SOBRE",
+                    "AMORTIZA",
+                    "EMPRESTIMO",
+                    "LEILAO DE FRACAO",
+                    "REEMBOLSO",
+                ]
+                fee_terms = ["TAXA", "TARIFA", "IR", "IOF"]
+                transfer_terms = ["TRANSFER", "LIQUIDA"]
 
                 if any(t in m_upper for t in earn_terms):
-                    return 'EARNINGS'
+                    return "EARNINGS"
                 if any(t in m_upper for t in fee_terms):
-                    return 'FEES'
+                    return "FEES"
                 if any(t in m_upper for t in transfer_terms):
-                    return 'TRANSFER'
+                    return "TRANSFER"
                 # reverse split: B3 records the new consolidated qty as a credit
-                if 'GRUPAMENTO' in m_upper:
-                    return 'REVERSE_SPLIT'
+                if "GRUPAMENTO" in m_upper:
+                    return "REVERSE_SPLIT"
                 # split / bonus shares: additional shares credited at zero cost
-                if 'DESDOBRAMENTO' in m_upper or 'BONIFICACAO' in m_upper:
-                    return 'SPLIT'
+                if "DESDOBRAMENTO" in m_upper or "BONIFICACAO" in m_upper:
+                    return "SPLIT"
                 # fractional shares removed by the custodian (proceeds come via leilão)
-                if 'FRACAO EM ATIVOS' in m_upper:
-                    return 'SELL'
-                return 'IGNORE'
+                if "FRACAO EM ATIVOS" in m_upper:
+                    return "SELL"
+                return "IGNORE"
 
-            temp['type'] = df['Movimentação'].apply(map_mov)
+            temp["type"] = df["Movimentação"].apply(map_mov)
 
             def classify_earning(m):
                 m_upper = _norm(m)
-                if 'DIVIDENDO' in m_upper:
-                    return 'Dividend'
-                if 'JUROS SOBRE' in m_upper or 'JCP' in m_upper:
-                    return 'JCP'
-                if 'AMORTIZA' in m_upper:
-                    return 'Amortization'
-                return 'Income'
+                if "DIVIDENDO" in m_upper:
+                    return "Dividend"
+                if "JUROS SOBRE" in m_upper or "JCP" in m_upper:
+                    return "JCP"
+                if "AMORTIZA" in m_upper:
+                    return "Amortization"
+                return "Income"
 
-            temp['sub_type'] = df['Movimentação'].apply(classify_earning)
-            temp['source'] = 'MOV'
+            temp["sub_type"] = df["Movimentação"].apply(classify_earning)
+            temp["source"] = "MOV"
 
             stats_rows.append(
                 {
-                    'file': file_name,
-                    'detected': 'MOV',
-                    'rows_total': int(len(temp)),
-                    'rows_buy': 0,
-                    'rows_sell': 0,
-                    'rows_earnings': int((temp['type'] == 'EARNINGS').sum()),
-                    'rows_fees': int((temp['type'] == 'FEES').sum()),
-                    'rows_transfer': int((temp['type'] == 'TRANSFER').sum()),
-                    'rows_ignored': int((temp['type'] == 'IGNORE').sum()),
+                    "file": file_name,
+                    "detected": "MOV",
+                    "rows_total": int(len(temp)),
+                    "rows_buy": 0,
+                    "rows_sell": 0,
+                    "rows_earnings": int((temp["type"] == "EARNINGS").sum()),
+                    "rows_fees": int((temp["type"] == "FEES").sum()),
+                    "rows_transfer": int((temp["type"] == "TRANSFER").sum()),
+                    "rows_ignored": int((temp["type"] == "IGNORE").sum()),
                 }
             )
 
             # corporate actions (splits, reverse splits, fractional debits) must flow into
             # main_df alongside earnings so calculate_portfolio can adjust share counts.
-            _main_types = {'EARNINGS', 'SPLIT', 'REVERSE_SPLIT', 'SELL'}
-            all_data.append(temp[temp['type'].isin(_main_types)])
+            _main_types = {"EARNINGS", "SPLIT", "REVERSE_SPLIT", "SELL"}
+            all_data.append(temp[temp["type"].isin(_main_types)])
 
-            audit_rows.append(temp[~temp['type'].isin(_main_types)])
+            audit_rows.append(temp[~temp["type"].isin(_main_types)])
 
-    main_df = pd.concat(all_data).sort_values(by='date', ascending=False) if all_data else pd.DataFrame()
-    stats_df = pd.DataFrame(stats_rows).sort_values(['file', 'detected']) if stats_rows else None
-    audit_df = pd.concat(audit_rows).sort_values(by='date', ascending=False) if audit_rows else pd.DataFrame()
+            logger.info(
+                "File %s: detected MOV statement — total=%d earnings=%d "
+                "fees=%d transfer=%d ignored=%d",
+                file_name,
+                len(temp),
+                int((temp["type"] == "EARNINGS").sum()),
+                int((temp["type"] == "FEES").sum()),
+                int((temp["type"] == "TRANSFER").sum()),
+                int((temp["type"] == "IGNORE").sum()),
+            )
+        else:
+            logger.warning(
+                "File %s: could not detect statement type "
+                "(no 'Data do Negócio' or 'Movimentação' column).",
+                file_name,
+            )
+
+    main_df = (
+        pd.concat(all_data).sort_values(by="date", ascending=False) if all_data else pd.DataFrame()
+    )
+    stats_df = pd.DataFrame(stats_rows).sort_values(["file", "detected"]) if stats_rows else None
+    audit_df = (
+        pd.concat(audit_rows).sort_values(by="date", ascending=False)
+        if audit_rows
+        else pd.DataFrame()
+    )
 
     # --- Deduplication across multiple uploads (common when importing overlapping periods) ---
     def _dedup(df: pd.DataFrame) -> tuple[pd.DataFrame, int, int]:
@@ -249,13 +298,28 @@ def load_and_process_files(uploaded_files):
             return df, 0, 0
         before = int(len(df))
 
-        cols = [c for c in ['date', 'ticker', 'type', 'qty', 'val', 'inst', 'source', 'sub_type', 'desc'] if c in df.columns]
-        out = df.drop_duplicates(subset=cols, keep='first')
+        cols = [
+            c
+            for c in ["date", "ticker", "type", "qty", "val", "inst", "source", "sub_type", "desc"]
+            if c in df.columns
+        ]
+        out = df.drop_duplicates(subset=cols, keep="first")
         after = int(len(out))
         return out, before, after
 
     main_df, main_before, main_after = _dedup(main_df)
     audit_df, audit_before, audit_after = _dedup(audit_df)
+
+    if main_before != main_after or audit_before != audit_after:
+        logger.info(
+            "Dedup: main %d -> %d rows (removed %d); audit %d -> %d rows (removed %d)",
+            main_before,
+            main_after,
+            main_before - main_after,
+            audit_before,
+            audit_after,
+            audit_before - audit_after,
+        )
 
     # Append a small summary row to the import stats (non-breaking for the UI).
     if stats_df is None:
@@ -268,17 +332,17 @@ def load_and_process_files(uploaded_files):
                 pd.DataFrame(
                     [
                         {
-                            'file': '(ALL)',
-                            'detected': 'DEDUP',
-                            'rows_total': main_before,
-                            'rows_buy': None,
-                            'rows_sell': None,
-                            'rows_earnings': None,
-                            'rows_fees': None,
-                            'rows_transfer': None,
-                            'rows_ignored': None,
-                            'dedup_removed_main': main_before - main_after,
-                            'dedup_removed_audit': audit_before - audit_after,
+                            "file": "(ALL)",
+                            "detected": "DEDUP",
+                            "rows_total": main_before,
+                            "rows_buy": None,
+                            "rows_sell": None,
+                            "rows_earnings": None,
+                            "rows_fees": None,
+                            "rows_transfer": None,
+                            "rows_ignored": None,
+                            "dedup_removed_main": main_before - main_after,
+                            "dedup_removed_audit": audit_before - audit_after,
                         }
                     ]
                 ),
@@ -299,51 +363,58 @@ def calculate_portfolio(df, split_history=None):
     """
     summary = []
 
-    for ticker, data in df.groupby('ticker'):
+    # canonicalize renamed tickers so old and new codes merge into one position
+    # (a fund renamed mid-holding otherwise appears as two separate rows).
+    df = df.copy()
+    df["ticker"] = df["ticker"].apply(lambda t: TICKER_REMAP[t]["new"] if t in TICKER_REMAP else t)
+
+    for ticker, data in df.groupby("ticker"):
         if ticker in DISCONTINUED_TICKERS:
             logger.debug("Skipping discontinued ticker %s.", ticker)
             continue
-        data = data.sort_values('date').copy()
+        data = data.sort_values("date").copy()
         qty, cost, earnings = 0.0, 0.0, 0.0
 
         # only inject yfinance splits when the MOV file didn't already supply them,
         # to avoid double-applying the same corporate action from two sources.
-        has_mov_splits = data['type'].isin(['SPLIT', 'REVERSE_SPLIT']).any()
+        has_mov_splits = data["type"].isin(["SPLIT", "REVERSE_SPLIT"]).any()
 
         if not has_mov_splits and split_history and ticker in split_history:
             synthetic = []
             for ev in split_history[ticker]:
-                split_type = 'SPLIT' if ev['ratio'] >= 1.0 else 'REVERSE_SPLIT'
-                synthetic.append({
-                    'date': ev['date'],
-                    'ticker': ticker,
-                    'type': split_type,
-                    # store ratio in the qty field; identified by source='yfinance_split'
-                    'qty': ev['ratio'],
-                    'val': 0.0,
-                    'source': 'yfinance_split',
-                })
+                split_type = "SPLIT" if ev["ratio"] >= 1.0 else "REVERSE_SPLIT"
+                synthetic.append(
+                    {
+                        "date": ev["date"],
+                        "ticker": ticker,
+                        "type": split_type,
+                        # store ratio in the qty field; identified by source='yfinance_split'
+                        "qty": ev["ratio"],
+                        "val": 0.0,
+                        "source": "yfinance_split",
+                    }
+                )
             if synthetic:
                 extra = pd.DataFrame(synthetic)
                 for col in data.columns:
                     if col not in extra.columns:
                         extra[col] = None
-                data = pd.concat([data, extra], ignore_index=True).sort_values('date')
+                data = pd.concat([data, extra], ignore_index=True).sort_values("date")
 
         for _, row in data.iterrows():
-            if row['type'] == 'BUY':
-                qty += float(row.get('qty', 0) or 0)
-                cost += float(row.get('val', 0) or 0)
+            if row["type"] == "BUY":
+                qty += float(row.get("qty", 0) or 0)
+                cost += float(row.get("val", 0) or 0)
 
-            elif row['type'] == 'SELL':
-                sell_qty = float(row.get('qty', 0) or 0)
+            elif row["type"] == "SELL":
+                sell_qty = float(row.get("qty", 0) or 0)
                 if qty <= 0:
                     continue
 
                 if sell_qty > qty:
                     # Guardrail: avoid negative quantities if statement is inconsistent.
                     logger.warning(
-                        "Sell quantity greater than current position for %s: sell=%s, held=%s. Clamping.",
+                        "Sell qty > position for %s: sell=%s, held=%s. Clamping.",
                         ticker,
                         sell_qty,
                         qty,
@@ -354,36 +425,36 @@ def calculate_portfolio(df, split_history=None):
                 qty -= sell_qty
                 cost = qty * avg_p
 
-            elif row['type'] == 'EARNINGS':
-                earnings += float(row.get('val', 0) or 0)
+            elif row["type"] == "EARNINGS":
+                earnings += float(row.get("val", 0) or 0)
 
-            elif row['type'] == 'SPLIT':
-                if str(row.get('source', '')) == 'yfinance_split':
+            elif row["type"] == "SPLIT":
+                if str(row.get("source", "")) == "yfinance_split":
                     # ratio stored in qty: multiply current position
-                    qty = qty * float(row.get('qty', 1.0) or 1.0)
+                    qty = qty * float(row.get("qty", 1.0) or 1.0)
                 else:
                     # MOV-sourced: qty column holds the number of new shares credited
-                    qty += float(row.get('qty', 0) or 0)
+                    qty += float(row.get("qty", 0) or 0)
 
-            elif row['type'] == 'REVERSE_SPLIT':
-                if str(row.get('source', '')) == 'yfinance_split':
+            elif row["type"] == "REVERSE_SPLIT":
+                if str(row.get("source", "")) == "yfinance_split":
                     # ratio stored in qty: multiply current position (ratio < 1 so qty shrinks)
-                    qty = qty * float(row.get('qty', 1.0) or 1.0)
+                    qty = qty * float(row.get("qty", 1.0) or 1.0)
                 else:
                     # MOV-sourced: qty column holds the exact post-grupamento shares
-                    new_qty = float(row.get('qty', 0) or 0)
+                    new_qty = float(row.get("qty", 0) or 0)
                     if new_qty > 0:
                         qty = new_qty
 
         if round(qty, 4) > 0 or earnings != 0:
             summary.append(
                 {
-                    'ticker': ticker,
-                    'qty': qty,
-                    'avg_price': cost / qty if qty > 0 else 0,
-                    'total_cost': cost,
-                    'earnings': earnings,
-                    'asset_type': detect_asset_type(ticker),
+                    "ticker": ticker,
+                    "qty": qty,
+                    "avg_price": cost / qty if qty > 0 else 0,
+                    "total_cost": cost,
+                    "earnings": earnings,
+                    "asset_type": detect_asset_type(ticker),
                 }
             )
 
@@ -402,6 +473,8 @@ def fetch_split_history(tickers: tuple) -> dict:
     """
     result = {}
     for t in tickers:
+        if t in DISCONTINUED_TICKERS:
+            continue
         sa = f"{TICKER_REMAP[t]['new'] if t in TICKER_REMAP else t}.SA"
         try:
             splits = yf.Ticker(sa).splits
@@ -434,7 +507,9 @@ def fetch_market_prices(tickers):
     try:
         # resolve any renamed tickers before querying Yahoo Finance
         sa_tickers = [f"{TICKER_REMAP[t]['new'] if t in TICKER_REMAP else t}.SA" for t in tickers]
-        data = yf.download(sa_tickers, period="1mo", progress=False, group_by="ticker", auto_adjust=True)
+        data = yf.download(
+            sa_tickers, period="1mo", progress=False, group_by="ticker", auto_adjust=True
+        )
         for t in tickers:
             try:
                 s = f"{TICKER_REMAP[t]['new'] if t in TICKER_REMAP else t}.SA"
@@ -449,7 +524,13 @@ def fetch_market_prices(tickers):
 
 
 def analyze_position(
-    ticker, qty, avg_price, total_cost, current_price, earnings, asset_type,
+    ticker,
+    qty,
+    avg_price,
+    total_cost,
+    current_price,
+    earnings,
+    asset_type,
     portfolio_total_value=0.0,
 ):
     """Return a structured position analysis with an actionable recommendation.
@@ -488,7 +569,9 @@ def analyze_position(
     breakeven_price = effective_cost / qty if qty > 0 else avg_price
 
     yield_on_cost = earnings / total_cost * 100 if total_cost > 0 else 0.0
-    current_weight = market_value / portfolio_total_value * 100 if portfolio_total_value > 0 else 0.0
+    current_weight = (
+        market_value / portfolio_total_value * 100 if portfolio_total_value > 0 else 0.0
+    )
 
     notes = []
     targets = []
@@ -496,9 +579,9 @@ def analyze_position(
 
     # trailing stop levels: tighter for FIIs (less volatile), wider for stocks
     # floor at breakeven — never allow a stop that guarantees a loss vs effective cost
-    if asset_type in ('FII/ETF',):
+    if asset_type in ("FII/ETF",):
         trail_pct = 0.08
-    elif asset_type == 'BDR':
+    elif asset_type == "BDR":
         trail_pct = 0.12
     else:
         trail_pct = 0.15
@@ -516,17 +599,19 @@ def analyze_position(
         return w > 10.0, round(w, 1)
 
     if yield_pct >= 0:
-        scenario = 'gain' if yield_pct > 0.5 else 'flat'
+        scenario = "gain" if yield_pct > 0.5 else "flat"
 
         # pyramid scale-out targets
         target_levels = [
-            ('target_20pct',  avg_price * 1.20, 0.25),
-            ('target_50pct',  avg_price * 1.50, 0.33),
-            ('target_double', avg_price * 2.00, 0.50),
+            ("target_20pct", avg_price * 1.20, 0.25),
+            ("target_50pct", avg_price * 1.50, 0.33),
+            ("target_double", avg_price * 2.00, 0.50),
         ]
         for label, price, frac in target_levels:
             if price >= current_price:
-                targets.append({'label': label, 'price': round(price, 2), 'qty_to_sell': round(qty * frac, 0)})
+                targets.append(
+                    {"label": label, "price": round(price, 2), "qty_to_sell": round(qty * frac, 0)}
+                )
 
         # DCA top-up only when still far from first target (<20% gain)
         if yield_pct < 20:
@@ -534,28 +619,30 @@ def analyze_position(
             new_qty = qty + add_qty
             new_avg = (total_cost + add_qty * current_price) / new_qty
             conc, nw = _concentration(add_qty)
-            dca = [{
-                'label': 'dca_topup',
-                'add_qty': add_qty,
-                'add_price': current_price,
-                'new_avg': round(new_avg, 2),
-                'new_total': round(total_cost + add_qty * current_price, 2),
-                'concentration_risk': conc,
-                'new_weight': nw,
-            }]
+            dca = [
+                {
+                    "label": "dca_topup",
+                    "add_qty": add_qty,
+                    "add_price": current_price,
+                    "new_avg": round(new_avg, 2),
+                    "new_total": round(total_cost + add_qty * current_price, 2),
+                    "concentration_risk": conc,
+                    "new_weight": nw,
+                }
+            ]
 
         if yield_pct > 50:
-            notes.append('note_high_gain')
+            notes.append("note_high_gain")
         if total_cost > 0 and earnings / total_cost >= 0.05:
-            notes.append('note_earnings_offset')
+            notes.append("note_earnings_offset")
 
     else:
-        scenario = 'loss'
+        scenario = "loss"
 
         # only suggest DCA when loss < 30%; beyond that the sunk-cost check applies
         dca_levels = [
-            ('dca_50pct_recovery', (avg_price + current_price) / 2),
-            ('dca_5pct_above',     current_price * 1.05),
+            ("dca_50pct_recovery", (avg_price + current_price) / 2),
+            ("dca_5pct_above", current_price * 1.05),
         ]
         dca = []
         for label, target_avg in dca_levels:
@@ -569,48 +656,50 @@ def analyze_position(
             new_qty = qty + add_qty
             new_avg = (total_cost + add_qty * current_price) / new_qty
             conc, nw = _concentration(add_qty)
-            dca.append({
-                'label': label,
-                'add_qty': add_qty,
-                'add_price': current_price,
-                'new_avg': round(new_avg, 2),
-                'new_total': round(total_cost + add_qty * current_price, 2),
-                'concentration_risk': conc,
-                'new_weight': nw,
-            })
+            dca.append(
+                {
+                    "label": label,
+                    "add_qty": add_qty,
+                    "add_price": current_price,
+                    "new_avg": round(new_avg, 2),
+                    "new_total": round(total_cost + add_qty * current_price, 2),
+                    "concentration_risk": conc,
+                    "new_weight": nw,
+                }
+            )
 
         if abs(yield_pct) > 30:
-            notes.append('note_deep_loss')
+            notes.append("note_deep_loss")
         if earnings > 0:
-            notes.append('note_earnings_offset')
+            notes.append("note_earnings_offset")
 
     # recommendation — priority order matters
     if price_below_stop and yield_on_cost >= 8.0:
-        recommendation = 'hold'   # dividend income offsets the stop signal
+        recommendation = "hold"  # dividend income offsets the stop signal
     elif price_below_stop:
-        recommendation = 'exit'
-    elif scenario == 'gain' and yield_pct >= 50:
-        recommendation = 'trim'
-    elif scenario in ('gain', 'flat'):
-        recommendation = 'hold'
+        recommendation = "exit"
+    elif scenario == "gain" and yield_pct >= 50:
+        recommendation = "trim"
+    elif scenario in ("gain", "flat"):
+        recommendation = "hold"
     elif yield_on_cost >= 8.0:
-        recommendation = 'hold'   # dividend cushion in loss scenario
-    elif dca and any(not d['concentration_risk'] for d in dca):
-        recommendation = 'dca'
+        recommendation = "hold"  # dividend cushion in loss scenario
+    elif dca and any(not d["concentration_risk"] for d in dca):
+        recommendation = "dca"
     else:
-        recommendation = 'hold'   # concentration blocked or no valid DCA
+        recommendation = "hold"  # concentration blocked or no valid DCA
 
     return {
-        'scenario': scenario,
-        'recommendation': recommendation,
-        'yield_pct': round(yield_pct, 2),
-        'yield_on_cost': round(yield_on_cost, 2),
-        'breakeven': round(breakeven_price, 2),
-        'current_weight': round(current_weight, 1),
-        'current_price': round(current_price, 2),
-        'trailing_stop': round(trailing_stop, 2),
-        'price_below_stop': price_below_stop,
-        'targets': targets,
-        'dca': dca or [],
-        'notes': notes,
+        "scenario": scenario,
+        "recommendation": recommendation,
+        "yield_pct": round(yield_pct, 2),
+        "yield_on_cost": round(yield_on_cost, 2),
+        "breakeven": round(breakeven_price, 2),
+        "current_weight": round(current_weight, 1),
+        "current_price": round(current_price, 2),
+        "trailing_stop": round(trailing_stop, 2),
+        "price_below_stop": price_below_stop,
+        "targets": targets,
+        "dca": dca or [],
+        "notes": notes,
     }

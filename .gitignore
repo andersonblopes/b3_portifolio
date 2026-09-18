@@ -61,3 +61,8 @@ cmake-build-*/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# === LOGS ===
+# App logs may reference portfolio tickers/values; keep them local only.
+logs/
+*.log

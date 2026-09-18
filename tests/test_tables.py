@@ -84,8 +84,6 @@ def test_render_portfolio_table_selectable_returns_event(monkeypatch):
         events["kwargs"] = kwargs
         return FakeEvent()
 
-    fake_col_cfg = {}
-
     class FakeColumnConfig:
         class TextColumn:
             def __init__(self, *a, **kw):
@@ -120,7 +118,6 @@ def test_render_portfolio_table_selectable_returns_event(monkeypatch):
     assert events["kwargs"]["selection_mode"] == "single-row"
     assert events["kwargs"]["key"] == "test_key"
     # the hint column must be present in the styled dataframe
-    styler = events["kwargs"].get("arg") or list(events.values())[0]
     # verify the "📊" column was inserted into the dataframe passed to st.dataframe
     # (it's the first positional arg, not in kwargs for this fake)
     # recheck via monkeypatched capture
