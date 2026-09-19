@@ -11,28 +11,62 @@ Positions are computed by replaying every relevant row **in chronological
 order, per ticker** (`data.sort_values("date")`, grouped by canonicalized
 ticker). State kept per ticker while replaying: `qty`, `cost` (total cost
 basis in BRL), `earnings` (accumulated cash distributions, tracked
-separately and never mixed into `cost`).
+separately and never mixed into `cost`), `realized_pnl` (banked trading
+profit/loss, survives full exits), `gross_buys` (lifetime BUY cash outlay,
+never netted against SELLs — see "Invested capital vs. total bought" below).
 
 ## Event → effect table
 
 | `type`            | Effect                                                              | Code ref |
 |-------------------|----------------------------------------------------------------------|----------|
-| `BUY`             | `qty += row.qty; cost += row.val`                                    | utils.py:445 |
-| `SELL`            | `avg = cost/qty; qty -= sell_qty; cost = qty * avg` (clamped so qty never goes negative) | utils.py:449 |
-| `COST_RESET`      | `cost = qty * fetch_historical_price(ticker, date)` — Atualização (patrimonial restatement) | utils.py:468 |
-| `EARNINGS`        | `earnings += val` — does not touch qty/cost                          | utils.py:492 |
-| `AMORTIZATION`    | `cost = max(0, cost - val)` — return of capital, reduces cost, not income | utils.py:495 |
-| `BROKER_TRANSFER` | `cost = qty * fetch_historical_price(...)`, only when `val` is empty/zero (plain inter-broker transfer, not a settlement row) | utils.py:507 |
-| `SPLIT`           | MOV-sourced: `qty += new_shares_credited`. yfinance-sourced: `qty *= ratio` | utils.py:526 |
-| `REVERSE_SPLIT`   | MOV-sourced: `qty = new_qty` (absolute, not delta). yfinance-sourced: `qty *= ratio` (ratio < 1) | utils.py:534 |
+| `BUY`             | `qty += row.qty; cost += row.val; gross_buys += row.val`             | utils.py:450 |
+| `SELL`            | `avg = cost/qty; qty -= sell_qty; cost = qty * avg` (clamped so qty never goes negative) | utils.py:454 |
+| `COST_RESET`      | `cost = qty * fetch_historical_price(ticker, date)` — Atualização (patrimonial restatement) | utils.py:475 |
+| `EARNINGS`        | `earnings += val` — does not touch qty/cost                          | utils.py:499 |
+| `AMORTIZATION`    | `cost = max(0, cost - val)` — return of capital, reduces cost, not income | utils.py:502 |
+| `BROKER_TRANSFER` | `cost = qty * fetch_historical_price(...)`, only when `val` is empty/zero (plain inter-broker transfer, not a settlement row) | utils.py:517 |
+| `SPLIT`           | MOV-sourced: `qty += new_shares_credited`. yfinance-sourced: `qty *= ratio` | utils.py:541 |
+| `REVERSE_SPLIT`   | MOV-sourced: `qty = new_qty` (absolute, not delta). yfinance-sourced: `qty *= ratio` (ratio < 1) | utils.py:549 |
 
 Cost basis is **never** adjusted for splits/reverse-splits — only quantity
 changes, so `avg_price` naturally rescales. Cost is only reset on explicit
 Atualização, inter-broker transfers, and reduced by amortization payouts.
+`gross_buys` is untouched by every reset/reduction event (COST_RESET,
+BROKER_TRANSFER, AMORTIZATION, SELL) — it is a pure running sum of BUY rows.
 
 A position is only kept in the final summary if `round(qty, 4) > 0` **or**
-`earnings != 0` (utils.py:544) — so a fully-sold ticker that still paid
-dividends before the sale still shows up for the earnings total.
+`earnings != 0` **or** `realized_pnl != 0` **or** `gross_buys != 0`
+(utils.py:567) — so a fully-sold ticker that still paid dividends, realized
+a gain/loss, or was ever bought still shows up in the relevant totals.
+
+## Invested capital vs. total bought (dashboard KPIs)
+
+Two dashboard numbers look similar but answer different questions — the
+distinction matters because "sum of BUY − sum of SELL" is *not* a valid
+substitute for either one:
+
+- **Invested capital** (`inv_total` in `app.py`, sourced from
+  `total_cost`): cost basis of positions **still held** (`qty > 0` only).
+  Answers "what would it cost to rebuild what I currently hold". A profitable
+  SELL does not appear here at all — the remaining shares keep their original
+  average price, they're just fewer of them.
+- **Total bought** (`gross_buys_total` in `app.py`, sourced from
+  `gross_buys`): lifetime cash outlay across every BUY row, for every
+  ticker, including fully-exited ones. Answers "how much of my own money did
+  I ever put into B3". Never reduced by a SELL.
+
+Naively computing "money invested" as `sum(BUY.val) - sum(SELL.val)` conflates
+these two concerns and additionally launders realized trading P/L into the
+capital figure: selling above cost shrinks the naive total by more than the
+capital actually returned (the excess is profit, not principal), and selling
+at a loss does the opposite. Realized P/L is reported separately
+(`realized_pnl` / "Realized P/L" KPI) precisely so it isn't double-counted
+this way.
+
+**Total profit** (`total_profit` in `app.py`) = `realized_pnl` (banked
+trading P/L, all tickers) + `net_earnings` (dividends/JCP net of brokerage
+fees). It deliberately excludes unrealized P/L (`gross_pnl`, the hero-tier
+KPI) since that gain/loss isn't locked in yet.
 
 ## D-1 close convention (COST_RESET / BROKER_TRANSFER)
 

@@ -405,6 +405,19 @@ def calculate_portfolio(df, split_history=None):
     When provided, yfinance split events are injected for tickers that have
     no MOV-sourced corporate action rows (Grupamento / Desdobramento / Bonificação).
     This ensures correct qty/cost even when only a NEG file was uploaded.
+
+    Returns a per-ticker DataFrame with, among others:
+      - total_cost: cost basis of the position currently held (qty > 0 rows
+        only carry a meaningful avg_price/total_cost pair). This is what
+        "Invested capital" on the dashboard reports — the cost of what you
+        still hold, not lifetime cash outlay.
+      - gross_buys: sum of every BUY row's value for this ticker, across the
+        whole history, never reduced by SELLs and never reset by cost-basis
+        events (COST_RESET/BROKER_TRANSFER/AMORTIZATION only touch `cost`).
+        Kept even for fully-exited tickers. Used for "Total money put in
+        (lifetime)" — deliberately a different question from total_cost.
+      - realized_pnl: proceeds - cost_basis_sold, accumulated across partial
+        and full sells, survives full exits (ticker qty can be 0).
     """
     summary = []
 
@@ -419,6 +432,12 @@ def calculate_portfolio(df, split_history=None):
             continue
         data = data.sort_values("date").copy()
         qty, cost, earnings, realized_pnl = 0.0, 0.0, 0.0, 0.0
+        # gross_buys tracks the full historical cash outlay on BUY rows, never
+        # reduced by SELLs — distinct from `cost` (cost basis of the position
+        # still held). Kept even after the ticker is fully exited, so a
+        # portfolio-wide "total ever bought" figure isn't blind to closed
+        # positions the way portfolio_main (qty > 0 filter) is.
+        gross_buys = 0.0
 
         # only inject yfinance splits when the MOV file didn't already supply them,
         # to avoid double-applying the same corporate action from two sources.
@@ -448,8 +467,10 @@ def calculate_portfolio(df, split_history=None):
 
         for _, row in data.iterrows():
             if row["type"] == "BUY":
+                buy_val = float(row.get("val", 0) or 0)
                 qty += float(row.get("qty", 0) or 0)
-                cost += float(row.get("val", 0) or 0)
+                cost += buy_val
+                gross_buys += buy_val
 
             elif row["type"] == "SELL":
                 sell_qty = float(row.get("qty", 0) or 0)
@@ -556,13 +577,14 @@ def calculate_portfolio(df, split_history=None):
                     if new_qty > 0:
                         qty = new_qty
 
-        if round(qty, 4) > 0 or earnings != 0 or realized_pnl != 0:
+        if round(qty, 4) > 0 or earnings != 0 or realized_pnl != 0 or gross_buys != 0:
             summary.append(
                 {
                     "ticker": ticker,
                     "qty": qty,
                     "avg_price": cost / qty if qty > 0 else 0,
                     "total_cost": cost,
+                    "gross_buys": gross_buys,
                     "earnings": earnings,
                     "realized_pnl": realized_pnl,
                     "asset_type": detect_asset_type(ticker),

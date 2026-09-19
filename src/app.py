@@ -583,16 +583,35 @@ if st.session_state.raw_df is not None:
     if "realized_pnl" in portfolio.columns:
         realized_total = float(portfolio["realized_pnl"].sum()) * factor
 
+    # Lifetime cash outlay: sum of every BUY row ever, across all tickers
+    # (open and fully-exited alike) — deliberately NOT netted against SELLs.
+    # "Invested capital" (inv_total) answers "what do my open positions cost
+    # me"; this answers "how much of my own money did I ever put into B3".
+    gross_buys_total = 0.0
+    if "gross_buys" in portfolio.columns:
+        gross_buys_total = float(portfolio["gross_buys"].sum()) * factor
+
+    # Total profit: everything already banked — realized trading P/L plus
+    # dividends/JCP net of brokerage fees. Excludes unrealized P/L (gross_pnl,
+    # tier 1) since that money isn't locked in yet.
+    total_profit = realized_total + net_earnings
+
     # --- KPI hierarchy -------------------------------------------------
-    # Design intent (B3 finance + wealth-management review): not all five
-    # totals carry equal weight for a glance-and-decide read.
+    # Design intent (B3 finance + wealth-management review): not all totals
+    # carry equal weight for a glance-and-decide read.
     #   Tier 1 (hero)      — Market value: "what do I have right now".
     #   Tier 2 (primary)   — Invested capital & Unrealized P/L: the two
     #                        numbers that explain the hero figure.
-    #   Tier 3 (secondary) — Earnings received & Realized P/L: money
-    #                        already banked/settled, a separate concern
+    #                        "Total bought" caption sits right below Invested
+    #                        capital — same visual weight as a footnote, since
+    #                        it answers a related but distinct question
+    #                        (lifetime cash outlay vs. open-position cost).
+    #   Tier 3 (secondary) — Earnings received, Realized P/L & Total profit:
+    #                        money already banked/settled, a separate concern
     #                        from the live open position above, so it's
     #                        visually smaller and set apart by a divider.
+    #                        Total profit = Realized P/L + net earnings, so
+    #                        it is NOT summed again into anything else here.
     st.markdown(
         """
 <style>
@@ -622,18 +641,21 @@ if st.session_state.raw_df is not None:
             colored_metric(hc2, texts["gross_pnl"], gross_pnl, big=True)
 
     st.caption(f"{texts['total_invested']}: {fmt_reg(inv_total)}")
+    st.caption(f"{texts['total_bought']}: {fmt_reg(gross_buys_total)}")
 
     if has_earnings or realized_total != 0:
         st.divider()
         st.caption(texts["kpi_section_realized_label"])
         with st.container(key="kpi_realized"):
-            rc1, rc2 = st.columns(2)
+            rc1, rc2, rc3 = st.columns(3)
             if has_earnings:
                 with rc1:
                     colored_metric(rc1, texts["total_earnings"], earn_total)
                     rc1.caption(texts["kpi_net_caption"].format(value=fmt_reg(net_earnings)))
             with rc2:
                 colored_metric(rc2, texts["kpi_realized_pnl"], realized_total)
+            with rc3:
+                colored_metric(rc3, texts["kpi_total_profit"], total_profit)
 
     show_audit = st.session_state.audit_df is not None and not st.session_state.audit_df.empty
 

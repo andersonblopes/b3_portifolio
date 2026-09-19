@@ -214,6 +214,48 @@ def test_calculate_portfolio_realized_pnl_survives_full_exit():
     assert row["realized_pnl"] == pytest.approx(30.0)
 
 
+def test_calculate_portfolio_gross_buys_not_reduced_by_sells():
+    # gross_buys tracks lifetime BUY cash outlay only; unlike total_cost it
+    # must NOT be netted against SELL proceeds — it answers "how much did I
+    # ever put in", not "what does my remaining position cost".
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2026-01-01", "2026-01-02", "2026-01-03"]),
+            "ticker": ["PETR4", "PETR4", "PETR4"],
+            "type": ["BUY", "SELL", "BUY"],
+            "qty": [10, 4, 5],
+            "val": [100.0, 60.0, 55.0],
+        }
+    )
+
+    out = utils.calculate_portfolio(df)
+    row = out[out["ticker"] == "PETR4"].iloc[0]
+    # BUY 100 + BUY 55 = 155, regardless of the SELL in between
+    assert row["gross_buys"] == pytest.approx(155.0)
+    # total_cost (cost basis of what's left) is netted by the sell, so it
+    # must differ from gross_buys once a sell has occurred.
+    assert row["total_cost"] != pytest.approx(row["gross_buys"])
+
+
+def test_calculate_portfolio_gross_buys_survives_full_exit():
+    # A fully-exited ticker (qty -> 0) must still report its lifetime
+    # gross_buys, the same way realized_pnl survives a full exit.
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2026-01-01", "2026-01-02"]),
+            "ticker": ["PETR4", "PETR4"],
+            "type": ["BUY", "SELL"],
+            "qty": [10, 10],
+            "val": [100.0, 130.0],
+        }
+    )
+
+    out = utils.calculate_portfolio(df)
+    row = out[out["ticker"] == "PETR4"].iloc[0]
+    assert row["qty"] == pytest.approx(0.0)
+    assert row["gross_buys"] == pytest.approx(100.0)
+
+
 def test_calculate_portfolio_skips_discontinued_tickers():
     df = pd.DataFrame(
         {
