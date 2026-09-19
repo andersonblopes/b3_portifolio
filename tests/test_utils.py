@@ -162,13 +162,56 @@ def test_calculate_portfolio_clamps_sell_bigger_than_position():
             "ticker": ["PETR4", "PETR4"],
             "type": ["BUY", "SELL"],
             "qty": [10, 999],
-            "val": [100.0, 0.0],
+            "val": [100.0, 150.0],
         }
     )
 
     out = utils.calculate_portfolio(df)
-    # Position should not go negative; clamped to zero
-    assert out.empty
+    # Position should not go negative; clamped to zero. The row still surfaces
+    # (qty=0) because realized P/L must not be dropped for a fully-exited position.
+    row = out[out["ticker"] == "PETR4"].iloc[0]
+    assert row["qty"] == pytest.approx(0.0)
+    # clamp caps the sell at the 10 held shares regardless of the requested 999
+    assert row["realized_pnl"] == pytest.approx(50.0)
+
+
+def test_calculate_portfolio_tracks_realized_pnl_on_partial_sell():
+    # buy 10 @ 10 (cost 100), sell 4 @ 15 (proceeds 60) -> realized = 60 - 4*10 = 20
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2026-01-01", "2026-01-02"]),
+            "ticker": ["PETR4", "PETR4"],
+            "type": ["BUY", "SELL"],
+            "qty": [10, 4],
+            "val": [100.0, 60.0],
+        }
+    )
+
+    out = utils.calculate_portfolio(df)
+    row = out[out["ticker"] == "PETR4"].iloc[0]
+    assert row["realized_pnl"] == pytest.approx(20.0)
+    # remaining position keeps the original avg price
+    assert row["qty"] == pytest.approx(6.0)
+    assert row["avg_price"] == pytest.approx(10.0)
+
+
+def test_calculate_portfolio_realized_pnl_survives_full_exit():
+    # position fully closed (qty -> 0) must still appear for its realized P/L,
+    # even though it's excluded from portfolio_main (qty > 0) downstream.
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2026-01-01", "2026-01-02"]),
+            "ticker": ["PETR4", "PETR4"],
+            "type": ["BUY", "SELL"],
+            "qty": [10, 10],
+            "val": [100.0, 130.0],
+        }
+    )
+
+    out = utils.calculate_portfolio(df)
+    row = out[out["ticker"] == "PETR4"].iloc[0]
+    assert row["qty"] == pytest.approx(0.0)
+    assert row["realized_pnl"] == pytest.approx(30.0)
 
 
 def test_calculate_portfolio_skips_discontinued_tickers():
@@ -909,6 +952,7 @@ def test_analyze_position_current_price_in_result():
 # fetch_historical_price
 # ---------------------------------------------------------------------------
 
+
 def test_fetch_historical_price_returns_close_on_200(monkeypatch):
     """Returns the D-1 closing price (last trading day before the event date)."""
     import pandas as pd
@@ -979,6 +1023,7 @@ def test_fetch_historical_price_returns_none_on_exception(monkeypatch):
 # calculate_portfolio — COST_RESET event
 # ---------------------------------------------------------------------------
 
+
 def _make_mov_with_cost_reset() -> pd.DataFrame:
     """MOV-style rows: BUY 361 shares pre-event, COST_RESET, BUY 3 more after."""
     return pd.DataFrame(
@@ -1024,12 +1069,28 @@ def test_calculate_portfolio_cost_reset_resets_cost_basis(monkeypatch):
 
 def test_calculate_portfolio_amortization_reduces_cost():
     """Amortização (return of capital) must reduce cost basis, not increase earnings."""
-    df = pd.DataFrame([
-        {"date": "2024-01-10", "ticker": "BDIV11", "type": "BUY",
-         "qty": 10.0, "val": 700.0, "source": "NEG", "desc": "Compra"},
-        {"date": "2024-06-15", "ticker": "BDIV11", "type": "AMORTIZATION",
-         "qty": 10.0, "val": 200.0, "source": "MOV", "desc": "Amortização"},
-    ])
+    df = pd.DataFrame(
+        [
+            {
+                "date": "2024-01-10",
+                "ticker": "BDIV11",
+                "type": "BUY",
+                "qty": 10.0,
+                "val": 700.0,
+                "source": "NEG",
+                "desc": "Compra",
+            },
+            {
+                "date": "2024-06-15",
+                "ticker": "BDIV11",
+                "type": "AMORTIZATION",
+                "qty": 10.0,
+                "val": 200.0,
+                "source": "MOV",
+                "desc": "Amortização",
+            },
+        ]
+    )
     result = utils.calculate_portfolio(df)
     row = result[result["ticker"] == "BDIV11"].iloc[0]
     assert row["qty"] == pytest.approx(10.0)
@@ -1042,12 +1103,28 @@ def test_calculate_portfolio_broker_transfer_resets_cost(monkeypatch):
     """BROKER_TRANSFER (plain Transferência) resets cost basis via D-1 close."""
     monkeypatch.setattr(utils, "fetch_historical_price", lambda ticker, date: 38.45)
 
-    df = pd.DataFrame([
-        {"date": "2024-09-10", "ticker": "MFII11", "type": "BUY",
-         "qty": 23.0, "val": 2130.0, "source": "NEG", "desc": "Compra"},
-        {"date": "2026-09-11", "ticker": "MFII11", "type": "BROKER_TRANSFER",
-         "qty": 23.0, "val": 0.0, "source": "MOV", "desc": "Transferência"},
-    ])
+    df = pd.DataFrame(
+        [
+            {
+                "date": "2024-09-10",
+                "ticker": "MFII11",
+                "type": "BUY",
+                "qty": 23.0,
+                "val": 2130.0,
+                "source": "NEG",
+                "desc": "Compra",
+            },
+            {
+                "date": "2026-09-11",
+                "ticker": "MFII11",
+                "type": "BROKER_TRANSFER",
+                "qty": 23.0,
+                "val": 0.0,
+                "source": "MOV",
+                "desc": "Transferência",
+            },
+        ]
+    )
     result = utils.calculate_portfolio(df)
     row = result[result["ticker"] == "MFII11"].iloc[0]
     assert row["qty"] == pytest.approx(23.0)
@@ -1058,13 +1135,29 @@ def test_calculate_portfolio_broker_transfer_with_value_ignored(monkeypatch):
     """BROKER_TRANSFER with a non-zero val (settlement row) must NOT reset cost."""
     monkeypatch.setattr(utils, "fetch_historical_price", lambda ticker, date: 999.0)
 
-    df = pd.DataFrame([
-        {"date": "2024-09-10", "ticker": "MFII11", "type": "BUY",
-         "qty": 23.0, "val": 2130.0, "source": "NEG", "desc": "Compra"},
-        # val != 0 → skip the reset (this is a Transferência - Liquidação row)
-        {"date": "2024-09-11", "ticker": "MFII11", "type": "BROKER_TRANSFER",
-         "qty": 23.0, "val": 2300.0, "source": "MOV", "desc": "Transferência - Liquidação"},
-    ])
+    df = pd.DataFrame(
+        [
+            {
+                "date": "2024-09-10",
+                "ticker": "MFII11",
+                "type": "BUY",
+                "qty": 23.0,
+                "val": 2130.0,
+                "source": "NEG",
+                "desc": "Compra",
+            },
+            # val != 0 → skip the reset (this is a Transferência - Liquidação row)
+            {
+                "date": "2024-09-11",
+                "ticker": "MFII11",
+                "type": "BROKER_TRANSFER",
+                "qty": 23.0,
+                "val": 2300.0,
+                "source": "MOV",
+                "desc": "Transferência - Liquidação",
+            },
+        ]
+    )
     result = utils.calculate_portfolio(df)
     row = result[result["ticker"] == "MFII11"].iloc[0]
     assert row["total_cost"] == pytest.approx(2130.0, rel=1e-4)

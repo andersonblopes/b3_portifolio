@@ -273,8 +273,13 @@ def load_and_process_files(uploaded_files):
             # corporate actions (splits, reverse splits, fractional debits) must flow into
             # main_df alongside earnings so calculate_portfolio can adjust share counts.
             _main_types = {
-                "EARNINGS", "SPLIT", "REVERSE_SPLIT", "SELL",
-                "COST_RESET", "AMORTIZATION", "BROKER_TRANSFER",
+                "EARNINGS",
+                "SPLIT",
+                "REVERSE_SPLIT",
+                "SELL",
+                "COST_RESET",
+                "AMORTIZATION",
+                "BROKER_TRANSFER",
             }
             temp_main = temp[temp["type"].isin(_main_types)].copy()
             temp_main["_file_idx"] = file_idx
@@ -413,7 +418,7 @@ def calculate_portfolio(df, split_history=None):
             logger.debug("Skipping discontinued ticker %s.", ticker)
             continue
         data = data.sort_values("date").copy()
-        qty, cost, earnings = 0.0, 0.0, 0.0
+        qty, cost, earnings, realized_pnl = 0.0, 0.0, 0.0, 0.0
 
         # only inject yfinance splits when the MOV file didn't already supply them,
         # to avoid double-applying the same corporate action from two sources.
@@ -462,6 +467,8 @@ def calculate_portfolio(df, split_history=None):
                     sell_qty = qty
 
                 avg_p = cost / qty if qty > 0 else 0
+                proceeds = float(row.get("val", 0) or 0)
+                realized_pnl += proceeds - sell_qty * avg_p
                 qty -= sell_qty
                 cost = qty * avg_p
 
@@ -501,7 +508,10 @@ def calculate_portfolio(df, split_history=None):
                     cost = max(0.0, cost - amort_val)
                     logger.debug(
                         "AMORTIZATION for %s on %s: amount=%.2f new_cost=%.2f",
-                        ticker, row["date"], amort_val, cost,
+                        ticker,
+                        row["date"],
+                        amort_val,
+                        cost,
                     )
 
             elif row["type"] == "BROKER_TRANSFER":
@@ -514,13 +524,18 @@ def calculate_portfolio(df, split_history=None):
                         cost = qty * reset_price
                         logger.debug(
                             "BROKER_TRANSFER for %s on %s: qty=%.0f price=%.4f new_cost=%.2f",
-                            ticker, row["date"], qty, reset_price, cost,
+                            ticker,
+                            row["date"],
+                            qty,
+                            reset_price,
+                            cost,
                         )
                     else:
                         logger.warning(
                             "BROKER_TRANSFER for %s on %s: could not fetch price, "
                             "cost basis unchanged.",
-                            ticker, row["date"],
+                            ticker,
+                            row["date"],
                         )
 
             elif row["type"] == "SPLIT":
@@ -541,7 +556,7 @@ def calculate_portfolio(df, split_history=None):
                     if new_qty > 0:
                         qty = new_qty
 
-        if round(qty, 4) > 0 or earnings != 0:
+        if round(qty, 4) > 0 or earnings != 0 or realized_pnl != 0:
             summary.append(
                 {
                     "ticker": ticker,
@@ -549,6 +564,7 @@ def calculate_portfolio(df, split_history=None):
                     "avg_price": cost / qty if qty > 0 else 0,
                     "total_cost": cost,
                     "earnings": earnings,
+                    "realized_pnl": realized_pnl,
                     "asset_type": detect_asset_type(ticker),
                 }
             )

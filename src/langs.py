@@ -28,7 +28,6 @@ LANGUAGES = {
         "yahoo_unavailable_warning": (
             "Live prices unavailable for {missing}/{total} tickers. Using average cost as fallback."
         ),
-        "missing_prices_expander": "Tickers without live price",
         "dedup_summary": "Duplicates removed: {removed} rows (from {before} to {after})",
         # --- Pagination ---
         "pagination_page_size": "Rows per page",
@@ -41,6 +40,10 @@ LANGUAGES = {
         "gross_pnl": "Unrealized P/L",
         "total_earnings": "Cash dividends / earnings",
         "kpi_earnings_net": "Net earnings",
+        "kpi_realized_pnl": "Realized P/L",
+        "kpi_hero_label": "Current position",
+        "kpi_section_realized_label": "Income received & results already realized",
+        "kpi_net_caption": "Net of fees: {value}",
         # --- Tabs ---
         "tab_visuals": "Dashboard",
         "tab_data": "Data Lab",
@@ -206,7 +209,6 @@ LANGUAGES = {
         "yahoo_unavailable_warning": (
             "Cotações indisponíveis para {missing}/{total} tickers. Usando preço médio como fallback."
         ),
-        "missing_prices_expander": "Tickers sem cotação ao vivo",
         "dedup_summary": "Duplicatas removidas: {removed} linhas (de {before} para {after})",
         # --- Pagination ---
         "pagination_page_size": "Linhas por página",
@@ -219,6 +221,10 @@ LANGUAGES = {
         "gross_pnl": "Lucro/Prejuízo (não realizado)",
         "total_earnings": "Proventos (caixa)",
         "kpi_earnings_net": "Proventos líquidos",
+        "kpi_realized_pnl": "Lucro/Prejuízo realizado",
+        "kpi_hero_label": "Posição atual",
+        "kpi_section_realized_label": "Renda recebida & resultados já realizados",
+        "kpi_net_caption": "Líquido de taxas: {value}",
         # --- Tabs ---
         "tab_visuals": "Painel visual",
         "tab_data": "Laboratório de dados",
@@ -384,7 +390,6 @@ LANGUAGES = {
         "yahoo_unavailable_warning": (
             "Cotizaciones no disponibles para {missing}/{total} tickers. Usando costo promedio como alternativa."
         ),
-        "missing_prices_expander": "Tickers sin cotización en vivo",
         "dedup_summary": "Duplicados eliminados: {removed} filas (de {before} a {after})",
         # --- Pagination ---
         "pagination_page_size": "Filas por página",
@@ -397,6 +402,10 @@ LANGUAGES = {
         "gross_pnl": "Ganancia/Pérdida (no realizada)",
         "total_earnings": "Dividendos / proventos (caja)",
         "kpi_earnings_net": "Proventos netos",
+        "kpi_realized_pnl": "P/L realizado",
+        "kpi_hero_label": "Posición actual",
+        "kpi_section_realized_label": "Ingresos recibidos y resultados ya realizados",
+        "kpi_net_caption": "Neto de comisiones: {value}",
         # --- Tabs ---
         "tab_visuals": "Panel",
         "tab_data": "Laboratorio de datos",
@@ -562,7 +571,6 @@ LANGUAGES = {
         "yahoo_unavailable_warning": (
             "Cours indisponibles pour {missing}/{total} tickers. Utilisation du coût moyen comme solution."
         ),
-        "missing_prices_expander": "Tickers sans prix en direct",
         "dedup_summary": "Doublons supprimés : {removed} lignes (de {before} à {after})",
         # --- Pagination ---
         "pagination_page_size": "Lignes par page",
@@ -575,6 +583,10 @@ LANGUAGES = {
         "gross_pnl": "P/L (non réalisé)",
         "total_earnings": "Dividendes / revenus (cash)",
         "kpi_earnings_net": "Revenus nets",
+        "kpi_realized_pnl": "P/L réalisé",
+        "kpi_hero_label": "Position actuelle",
+        "kpi_section_realized_label": "Revenus perçus & résultats déjà réalisés",
+        "kpi_net_caption": "Net de frais : {value}",
         # --- Tabs ---
         "tab_visuals": "Tableau de bord",
         "tab_data": "Laboratoire de données",

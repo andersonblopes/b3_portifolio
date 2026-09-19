@@ -406,7 +406,14 @@ with st.sidebar.expander(texts["sidebar_import"], expanded=False):
 
     if st.session_state.import_stats is not None and not st.session_state.import_stats.empty:
         st.caption(texts["import_summary_label"])
-        st.dataframe(st.session_state.import_stats, width="stretch", hide_index=True)
+        # The synthetic "(ALL)/DEDUP" row carries aggregate dedup counts, not
+        # per-file stats — it's mostly blank columns in the table and its
+        # numbers are already summarized in the caption below, so exclude it
+        # here to avoid showing the same information twice.
+        display_stats = st.session_state.import_stats
+        if "detected" in display_stats.columns:
+            display_stats = display_stats[display_stats["detected"] != "DEDUP"]
+        st.dataframe(display_stats, width="stretch", hide_index=True)
 
         # Optional dedup summary (if present)
         if "dedup_removed_main" in st.session_state.import_stats.columns:
@@ -447,6 +454,53 @@ def fmt_reg(v):
     return f"{sym} {v:.2f}".replace(".", decimal)
 
 
+# Colour semantics for portfolio P/L figures (financial-chart-design skill):
+# emerald-500 gain, rose-500 loss, zinc-400 neutral/zero. Never rely on colour
+# alone — every value also carries an explicit +/- sign and an arrow glyph.
+_PNL_COLORS = {"gain": "#10b981", "loss": "#f43f5e", "flat": "#a1a1aa"}
+
+
+def _pnl_bucket(v: float) -> str:
+    if v > 0:
+        return "gain"
+    if v < 0:
+        return "loss"
+    return "flat"
+
+
+def fmt_signed(v):
+    decimal = "," if (not is_usd and not is_eur) else "."
+    sign = "+" if v > 0 else ("" if v < 0 else "")
+    return f"{sym} {sign}{v:.2f}".replace(".", decimal)
+
+
+def colored_metric(container, label, value: float, *, big: bool = False, help_text=None):
+    """Render a P/L-style figure colour-coded gain/loss/flat.
+
+    st.metric doesn't expose a colour hook for its main value (only for the
+    delta), so gain/loss totals that stand on their own (not as a delta of
+    something else) get a small custom block instead, matching the metric's
+    label/value visual rhythm.
+    """
+    bucket = _pnl_bucket(value)
+    color = _PNL_COLORS[bucket]
+    arrow = {"gain": "▲", "loss": "▼", "flat": "●"}[bucket]
+    value_size = "2.2rem" if big else "1.35rem"
+    label_size = "0.95rem" if big else "0.78rem"
+    title_attr = f' title="{help_text}"' if help_text else ""
+    container.markdown(
+        f"""
+<div{title_attr} style="line-height:1.25;">
+  <div style="font-size:{label_size};opacity:0.75;">{label}</div>
+  <div style="font-size:{value_size};font-weight:600;color:{color};">
+    {arrow} {fmt_signed(value)}
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 PLOTLY_CONFIG = {
     "displayModeBar": False,
     "responsive": True,
@@ -480,8 +534,9 @@ if st.session_state.raw_df is not None:
                 total=len(tickers),
             )
         )
-        with st.sidebar.expander(texts["missing_prices_expander"], expanded=False):
-            st.write(", ".join(sorted(missing_tickers)))
+        # Ticker-level detail (last transaction date, discontinued exclusions)
+        # lives in the "Ticker changes" tab's "possibly discontinued" section —
+        # avoid repeating the same raw ticker list here.
 
     # prices[t]['p'] can be None when yfinance has no data; 'or 0' guards against None * factor
     res = portfolio_main["ticker"].apply(
@@ -516,18 +571,69 @@ if st.session_state.raw_df is not None:
         fees_total = float(
             st.session_state.audit_df[st.session_state.audit_df["type"] == "FEES"]["val"].sum()
         )
+    # audit_df values are always in BRL (raw statement currency); convert to the
+    # selected display currency before combining with already-converted earn_total.
+    fees_total *= factor
 
     net_earnings = earn_total + fees_total
 
-    k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric(texts["total_invested"], fmt_reg(inv_total))
-    k2.metric(
-        texts["market_value"], fmt_reg(mkt_total), f"{(mkt_total / inv_total - 1) * 100:.2f}%"
+    # realized P/L from SELL rows, including tickers already fully closed out
+    # (those never make it into portfolio_main, which is filtered to qty > 0).
+    realized_total = 0.0
+    if "realized_pnl" in portfolio.columns:
+        realized_total = float(portfolio["realized_pnl"].sum()) * factor
+
+    # --- KPI hierarchy -------------------------------------------------
+    # Design intent (B3 finance + wealth-management review): not all five
+    # totals carry equal weight for a glance-and-decide read.
+    #   Tier 1 (hero)      — Market value: "what do I have right now".
+    #   Tier 2 (primary)   — Invested capital & Unrealized P/L: the two
+    #                        numbers that explain the hero figure.
+    #   Tier 3 (secondary) — Earnings received & Realized P/L: money
+    #                        already banked/settled, a separate concern
+    #                        from the live open position above, so it's
+    #                        visually smaller and set apart by a divider.
+    st.markdown(
+        """
+<style>
+.st-key-kpi_hero [data-testid="stMetricLabel"] { font-size: 1rem; opacity: 0.8; }
+.st-key-kpi_hero [data-testid="stMetricValue"] { font-size: 2.6rem; }
+.st-key-kpi_hero [data-testid="stMetricDelta"] { font-size: 1.05rem; }
+.st-key-kpi_realized [data-testid="stMetricLabel"] { font-size: 0.78rem; opacity: 0.65; }
+.st-key-kpi_realized [data-testid="stMetricValue"] { font-size: 1.35rem; }
+.st-key-kpi_realized [data-testid="stMetricDelta"] { font-size: 0.85rem; }
+</style>
+""",
+        unsafe_allow_html=True,
     )
-    k3.metric(texts["gross_pnl"], fmt_reg(mkt_total - inv_total))
-    if has_earnings:
-        k4.metric(texts["total_earnings"], fmt_reg(earn_total))
-        k5.metric(texts["kpi_earnings_net"], fmt_reg(net_earnings))
+
+    gross_pnl = mkt_total - inv_total
+    mkt_pct = (mkt_total / inv_total - 1) * 100 if inv_total else 0.0
+
+    with st.container(key="kpi_hero"):
+        hc1, hc2 = st.columns([2, 1])
+        hc1.metric(
+            texts["market_value"],
+            fmt_reg(mkt_total),
+            f"{mkt_pct:+.2f}%",
+            help=texts["kpi_hero_label"],
+        )
+        with hc2:
+            colored_metric(hc2, texts["gross_pnl"], gross_pnl, big=True)
+
+    st.caption(f"{texts['total_invested']}: {fmt_reg(inv_total)}")
+
+    if has_earnings or realized_total != 0:
+        st.divider()
+        st.caption(texts["kpi_section_realized_label"])
+        with st.container(key="kpi_realized"):
+            rc1, rc2 = st.columns(2)
+            if has_earnings:
+                with rc1:
+                    colored_metric(rc1, texts["total_earnings"], earn_total)
+                    rc1.caption(texts["kpi_net_caption"].format(value=fmt_reg(net_earnings)))
+            with rc2:
+                colored_metric(rc2, texts["kpi_realized_pnl"], realized_total)
 
     show_audit = st.session_state.audit_df is not None and not st.session_state.audit_df.empty
 
@@ -551,8 +657,8 @@ if st.session_state.raw_df is not None:
         if not cf.empty:
             cf["cashflow"] = 0.0
             cf.loc[cf["type"] == "BUY", "cashflow"] = -cf.loc[cf["type"] == "BUY", "val"]
-            cf.loc[cf["type"].isin(["SELL", "EARNINGS"]), "cashflow"] = cf.loc[
-                cf["type"].isin(["SELL", "EARNINGS"]), "val"
+            cf.loc[cf["type"].isin(["SELL", "EARNINGS", "AMORTIZATION"]), "cashflow"] = cf.loc[
+                cf["type"].isin(["SELL", "EARNINGS", "AMORTIZATION"]), "val"
             ]
 
             cf2 = cf[["date", "cashflow"]]
