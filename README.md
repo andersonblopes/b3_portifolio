@@ -4,14 +4,16 @@ A **Streamlit** financial dashboard to consolidate **B3 (Brazilian Stock Exchang
 performance, passive income and asset allocation.
 
 > **Privacy:** your `.xlsx` files are processed locally.
-> **Internet:** the app can optionally query **brapi.dev** for live market prices and FX rates (e.g., **USD/BRL**, **EUR/BRL**). A free token is required — get one at https://brapi.dev/dashboard.
+> **Internet:** the app makes read-only calls to **Yahoo Finance** (`yfinance`, no token) for live market prices,
+> FX rates (**USD/BRL**, **EUR/BRL**), split history and historical close prices, and to **brapi.dev**
+> (no token, public icon CDN) for ticker logo images.
 
 ## 🚀 Features
 
 - **Multi-file upload**: upload multiple B3 `.xlsx` statements at once.
 - **Multi-currency**: toggle between **BRL (R$)**, **USD ($)** and **EUR (€)**.
 - **Internationalization**: **English**, **Português**, **Español** and **Français**.
-- **Market data (optional)**: brapi.dev integration for live prices + FX rates (free token required).
+- **Market data (optional)**: live prices, FX rates and split history via Yahoo Finance (no token); ticker logos via brapi.dev.
 - **Visual analytics**:
   - Portfolio evolution (cumulative flow)
   - Monthly passive income
@@ -111,7 +113,7 @@ Run:
 ## 🧯 Troubleshooting
 
 - **Nothing shows up after upload**: verify the file contains the expected columns (see “Expected input files”).
-- **Prices / FX do not refresh**: make sure your brapi.dev token is entered in the sidebar or set via the `BRAPI_TOKEN` environment variable. Get a free token at https://brapi.dev/dashboard.
+- **Prices / FX do not refresh**: Yahoo Finance may be rate-limiting or temporarily unreachable; click **Refresh Market Prices** again after a moment, or check `logs/app.log` for the underlying error. FX falls back to fixed rates (USD 5.45, EUR 5.90) if the fetch fails.
 - **Language or currency resets after reload**: the app persists these settings in the URL (query params like `?lang=pt&cur=EUR`).
 - **XLSX read errors**: upgrade dependencies and make sure the file is not corrupted.
 
@@ -127,6 +129,13 @@ Run:
 - Automated tests for parsing and calculation rules
 - Improve parsers to support more B3 export variations
 - Better consolidated Excel export
+
+## 📚 Deep-dive docs
+
+Scoped Software Design Documents live in `docs/` (see `docs/README.md` for
+the index) — architecture, the cost-basis engine, parsing rules, market
+data integration, the position analysis/advisory engine, UI internals,
+testing conventions, a B3/CVM glossary, and known limitations.
 
 ## 📄 License
 

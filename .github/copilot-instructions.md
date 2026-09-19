@@ -73,10 +73,10 @@ The app runs at http://127.0.0.1:8501.
 
 ### Data pipeline
 - Raw B3 files can be either **NEG** (Trading/Negotiation, detected by `Data do Negócio` column) or **MOV** (Movements, detected by `Movimentação` column).
-- Parsed rows always carry these normalized columns: `date`, `ticker`, `type`, `qty`, `val`, `inst`, `source`, `desc`.
-- `type` values: `BUY`, `SELL`, `EARNINGS`, `FEES`, `TRANSFER`, `IGNORE`.
-- Only `BUY`/`SELL`/`EARNINGS` rows go into `main_df`. Everything else goes to `audit_df`.
-- Deduplication runs after every upload using `drop_duplicates` on the full set of normalized columns.
+- Parsed rows always carry these normalized columns: `date`, `ticker`, `type`, `qty`, `val`, `inst`, `source`, `desc`, `sub_type` (MOV only).
+- `type` values: `BUY`, `SELL`, `EARNINGS`, `AMORTIZATION`, `COST_RESET`, `BROKER_TRANSFER`, `SPLIT`, `REVERSE_SPLIT`, `FEES`, `TRANSFER`, `IGNORE`.
+- Only `EARNINGS`, `SPLIT`, `REVERSE_SPLIT`, `SELL`, `COST_RESET`, `AMORTIZATION`, `BROKER_TRANSFER` rows go into `main_df` (`_main_types` in `utils.py`). `BUY` also goes to `main_df` via the NEG path. Everything else (`FEES`, `TRANSFER`, `IGNORE`) goes to `audit_df` only.
+- Deduplication is NOT a plain `drop_duplicates`: it's a file-aware max-per-group algorithm (`_dedup()` in `utils.py`) that keeps, for each unique key, the maximum count seen in any *single* source file — so two genuinely identical same-day trades aren't collapsed just because an overlapping upload also contains them. See `docs/03-data-ingestion-and-parsing.md`.
 
 ### Ticker handling
 - Always go through `clean_ticker()` in `utils.py`; do not manually strip suffixes elsewhere.
@@ -140,5 +140,16 @@ When testing locally, referencing sample files, or pointing the app at real stat
 ## Known Limitations / Watch Points
 - **Market prices** are fetched via **yfinance** using the `.SA` suffix (covers all B3 tickers). No token required.
 - **FX rates** (USD/BRL, EUR/BRL) are also fetched via **yfinance** (`USDBRL=X`, `EURBRL=X`). Falls back to fixed rates (USD 5.45, EUR 5.90) if yfinance is unavailable.
+- **brapi.dev** is used only for ticker logo lookups (`fetch_asset_logos`), not for prices/FX — despite what `README.md` may say; no token is used anywhere in `src/`.
 - `calculate_portfolio` iterates row-by-row in Python — acceptable for personal statement sizes, but avoid adding more loop-based logic there.
 - `detect_asset_type` uses simple suffix matching; edge cases (e.g. single-letter tickers) may misclassify.
+
+## Deep-dive docs
+
+For anything beyond this summary, load the relevant file from `docs/`
+instead of re-reading `src/` in full — each doc is scoped to one concern
+with direct code line references (see `docs/README.md` for the index):
+`01-overview-and-architecture`, `02-domain-financial-rules` (cost-basis
+engine), `03-data-ingestion-and-parsing`, `04-market-data-integration`,
+`05-position-analysis-engine`, `06-ui-frontend`, `07-testing-and-quality`,
+`08-glossary-b3-terms`, `09-known-limitations-and-roadmap`.
